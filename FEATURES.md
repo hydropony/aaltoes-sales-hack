@@ -10,7 +10,7 @@
 | 4 | Offer creation + storage | P3 | ✅ | ⬜ | ⬜ |
 | 5 | Offer approval workflow | P3 + P4 | ✅ | ⬜ | ⬜ |
 | 6 | Product + pricing catalog | P4 | ✅ | ⬜ | ⬜ |
-| 7 | Service catalog | P2 | ✅ | ⬜ | ⬜ |
+| 7 | Service catalog | P2 | ✅ | ✅ | ✅ |
 | 8 | Role-based access | P4 | ⬜ | ⬜ | ⬜ |
 | 9 | Personal dashboard (per role) | P2 + P3 + P4 | — | ⬜ | ⬜ |
 | 10 | Case & deal notes | P2 + P3 | ✅ | ✅ | ✅ |
@@ -42,9 +42,10 @@ Backend is the shared foundation. All routes are live at `http://localhost:8000/
 > Accounts hold contacts, deals, cases, activity timeline.
 
 - [x] Account list page (name, status, region, owner)
+- [x] Create account form
 - [x] Account detail page — tabbed: Overview / Deals / Cases / Timeline / Notes
 - [x] Contacts list on account detail
-- [ ] Add contact form
+- [x] Add contact form
 
 ### 2 · Case management
 > Status, priority, linked service, threaded notes.
