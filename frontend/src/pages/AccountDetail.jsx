@@ -5,6 +5,77 @@ import { api } from '@/lib/api'
 
 const TABS = ['Overview', 'Contacts', 'Deals', 'Cases', 'Timeline', 'Notes']
 
+const emptyContact = { first_name: '', last_name: '', email: '', phone: '', job_title: '', is_primary: false }
+
+function AddContactModal({ accountId, onClose, onSaved }) {
+  const [form, setForm] = useState(emptyContact)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState(null)
+
+  function set(field, value) {
+    setForm((f) => ({ ...f, [field]: value }))
+  }
+
+  async function submit(e) {
+    e.preventDefault()
+    if (!form.first_name.trim() || !form.last_name.trim()) {
+      setError('First and last name are required.')
+      return
+    }
+    setSaving(true)
+    try {
+      await api.createContact(accountId, form)
+      onSaved()
+      onClose()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+      <div className="bg-card border rounded-xl shadow-lg w-full max-w-md p-6">
+        <h2 className="text-lg font-semibold mb-4">Add Contact</h2>
+        <form onSubmit={submit} className="flex flex-col gap-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">First name *</label>
+              <input className="w-full border rounded-md px-3 py-2 text-sm bg-background" value={form.first_name} onChange={(e) => set('first_name', e.target.value)} />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Last name *</label>
+              <input className="w-full border rounded-md px-3 py-2 text-sm bg-background" value={form.last_name} onChange={(e) => set('last_name', e.target.value)} />
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">Job title</label>
+            <input className="w-full border rounded-md px-3 py-2 text-sm bg-background" value={form.job_title} onChange={(e) => set('job_title', e.target.value)} />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">Email</label>
+            <input type="email" className="w-full border rounded-md px-3 py-2 text-sm bg-background" value={form.email} onChange={(e) => set('email', e.target.value)} />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">Phone</label>
+            <input className="w-full border rounded-md px-3 py-2 text-sm bg-background" value={form.phone} onChange={(e) => set('phone', e.target.value)} />
+          </div>
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <input type="checkbox" checked={form.is_primary} onChange={(e) => set('is_primary', e.target.checked)} />
+            Primary contact
+          </label>
+          {error && <p className="text-destructive text-sm">{error}</p>}
+          <div className="flex justify-end gap-2 mt-2">
+            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+            <Button type="submit" disabled={saving}>{saving ? 'Saving...' : 'Add Contact'}</Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 export default function AccountDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -13,6 +84,7 @@ export default function AccountDetail() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [noteBody, setNoteBody] = useState('')
+  const [showAddContact, setShowAddContact] = useState(false)
 
   useEffect(() => {
     api.getAccount(id).then(setAccount).catch(console.error).finally(() => setLoading(false))
@@ -90,8 +162,15 @@ export default function AccountDetail() {
         <div>
           <div className="flex justify-between mb-4">
             <h2 className="font-semibold">Contacts</h2>
-            <Button size="sm">+ Add Contact</Button>
+            <Button size="sm" onClick={() => setShowAddContact(true)}>+ Add Contact</Button>
           </div>
+          {showAddContact && (
+            <AddContactModal
+              accountId={id}
+              onClose={() => setShowAddContact(false)}
+              onSaved={() => api.getAccountContacts(id).then(setData)}
+            />
+          )}
           <div className="rounded-lg border bg-card overflow-hidden">
             <table className="w-full text-sm">
               <thead className="border-b bg-muted/50">
