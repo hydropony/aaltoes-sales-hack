@@ -4,8 +4,8 @@
 
 | # | Feature | Owner | Backend | Frontend | Done |
 |---|---------|-------|---------|----------|------|
-| 1 | Account & contact management | P2 | ✅ | 🚧 | ⬜ |
-| 2 | Case management | P2 | ✅ | 🚧 | ⬜ |
+| 1 | Account & contact management | P2 | ✅ | ✅ | ✅ |
+| 2 | Case management | P2 | ✅ | ✅ | ✅ |
 | 3 | Deal pipeline + stages | P3 | ✅ | ⬜ | ⬜ |
 | 4 | Offer creation + storage | P3 | ✅ | ⬜ | ⬜ |
 | 5 | Offer approval workflow | P3 + P4 | ✅ | ⬜ | ⬜ |
@@ -13,7 +13,7 @@
 | 7 | Service catalog | P2 | ✅ | ⬜ | ⬜ |
 | 8 | Role-based access | P4 | ⬜ | ⬜ | ⬜ |
 | 9 | Personal dashboard (per role) | P2 + P3 + P4 | — | ⬜ | ⬜ |
-| 10 | Case & deal notes | P2 + P3 | ✅ | 🚧 | ⬜ |
+| 10 | Case & deal notes | P2 + P3 | ✅ | ✅ | ✅ |
 
 **Legend:** ✅ done · ⬜ not started · 🚧 in progress · — not applicable
 
@@ -72,7 +72,7 @@ Backend is the shared foundation. All routes are live at `http://localhost:8000/
 
 - [x] Note thread on case detail (timestamp)
 - [x] Add note form (body)
-- [ ] note_type badge + picker
+- [x] note_type badge + picker
 
 ---
 
