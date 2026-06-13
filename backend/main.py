@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime, date
 from typing import Optional
 
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
@@ -244,15 +244,10 @@ class OfferIn(BaseModel):
     discount_justification: Optional[str] = None
 
 class OfferSubmit(BaseModel):
-    created_by: int                          # rep user id
     discount_pct: float = 0.0
     discount_justification: Optional[str] = None
 
-class OfferApprove(BaseModel):
-    approver_id: int
-
 class OfferReject(BaseModel):
-    rejector_id: int
     reason: str
 
 
@@ -299,6 +294,37 @@ def _timeline(db, account_id, entity_type, entity_id, actor_id, event_type, summ
         account_id=account_id, entity_type=entity_type, entity_id=entity_id,
         actor_id=actor_id, event_type=event_type, summary=summary, extra=extra,
     ))
+
+
+# ── Auth ──────────────────────────────────────────────────────────────────────
+
+def get_current_user(x_user_id: int = Header(...), db: Session = Depends(get_db)) -> User:
+    """Read X-User-ID header and return the matching user. 401 if missing or invalid."""
+    user = db.get(User, x_user_id)
+    if not user:
+        raise HTTPException(401, "Invalid X-User-ID")
+    return user
+
+
+def require_role(*roles: str):
+    """Return a dependency that enforces the current user has one of the given roles."""
+    def guard(current_user: User = Depends(get_current_user)) -> User:
+        if current_user.role not in roles:
+            raise HTTPException(403, f"Requires role: {', '.join(roles)}")
+        return current_user
+    return guard
+
+
+@app.get("/auth/users", response_model=list[UserOut])
+def auth_users(db: Session = Depends(get_db)):
+    """List all active users — used by the frontend user-switcher dropdown."""
+    return db.query(User).filter_by(is_active=True).all()
+
+
+@app.get("/auth/me", response_model=UserOut)
+def auth_me(current_user: User = Depends(get_current_user)):
+    """Return the currently authenticated user."""
+    return current_user
 
 
 # ── Users ─────────────────────────────────────────────────────────────────────
@@ -371,8 +397,10 @@ def account_notes(account_id: int, db: Session = Depends(get_db)):
               .all())
 
 @app.post("/accounts/{account_id}/notes", response_model=NoteOut, status_code=201)
-def add_account_note(account_id: int, body: NoteIn, author_id: int, db: Session = Depends(get_db)):
-    note = Note(entity_type="account", entity_id=account_id, author_id=author_id, **body.model_dump())
+def add_account_note(account_id: int, body: NoteIn, db: Session = Depends(get_db),
+                     current_user: User = Depends(get_current_user)):
+    note = Note(entity_type="account", entity_id=account_id,
+                author_id=current_user.id, **body.model_dump())
     db.add(note)
     db.commit()
     db.refresh(note)
@@ -393,21 +421,23 @@ def get_deal(deal_id: int, db: Session = Depends(get_db)):
     return deal
 
 @app.post("/deals", response_model=DealOut, status_code=201)
-def create_deal(body: DealIn, owner_id: int, db: Session = Depends(get_db)):
+def create_deal(body: DealIn, db: Session = Depends(get_db),
+                current_user: User = Depends(get_current_user)):
     valid = valid_stages_for_channel(body.channel)
     if body.stage not in valid:
         raise HTTPException(400, f"Stage '{body.stage}' invalid for channel '{body.channel}'")
-    deal = Deal(owner_id=owner_id, **body.model_dump())
+    deal = Deal(owner_id=current_user.id, **body.model_dump())
     db.add(deal)
     db.flush()
-    _timeline(db, deal.account_id, "deal", deal.id, owner_id,
+    _timeline(db, deal.account_id, "deal", deal.id, current_user.id,
               "deal_created", f"Deal '{deal.name}' created")
     db.commit()
     db.refresh(deal)
     return deal
 
 @app.patch("/deals/{deal_id}/stage", response_model=DealOut)
-def update_stage(deal_id: int, body: StageUpdate, actor_id: int, db: Session = Depends(get_db)):
+def update_stage(deal_id: int, body: StageUpdate, db: Session = Depends(get_db),
+                 current_user: User = Depends(get_current_user)):
     deal = db.get(Deal, deal_id)
     if not deal:
         raise HTTPException(404, "Deal not found")
@@ -416,10 +446,10 @@ def update_stage(deal_id: int, body: StageUpdate, actor_id: int, db: Session = D
         raise HTTPException(400, f"Stage '{body.stage}' invalid for channel '{deal.channel}'")
     old_stage = deal.stage
     deal.stage = body.stage
-    deal.last_updated_by = actor_id
+    deal.last_updated_by = current_user.id
     if body.stage == "lost":
         deal.lost_reason = body.lost_reason
-    _timeline(db, deal.account_id, "deal", deal.id, actor_id,
+    _timeline(db, deal.account_id, "deal", deal.id, current_user.id,
               f"deal_{body.stage}" if body.stage in ("won", "lost") else "deal_stage_changed",
               f"Stage changed: {old_stage} → {body.stage}",
               extra={"old_stage": old_stage, "new_stage": body.stage})
@@ -444,8 +474,8 @@ def upsert_forecast(deal_id: int, rows: list[ForecastMonthIn], db: Session = Dep
                       .filter_by(deal_id=deal_id, year=r.year, month=r.month)
                       .first())
         if existing:
-            existing.device_units   = r.device_units
-            existing.device_revenue = r.device_revenue
+            existing.device_units    = r.device_units
+            existing.device_revenue  = r.device_revenue
             existing.service_revenue = r.service_revenue
         else:
             db.add(DealForecastMonth(deal_id=deal_id, **r.model_dump()))
@@ -465,8 +495,10 @@ def deal_notes(deal_id: int, db: Session = Depends(get_db)):
               .all())
 
 @app.post("/deals/{deal_id}/notes", response_model=NoteOut, status_code=201)
-def add_deal_note(deal_id: int, body: NoteIn, author_id: int, db: Session = Depends(get_db)):
-    note = Note(entity_type="deal", entity_id=deal_id, author_id=author_id, **body.model_dump())
+def add_deal_note(deal_id: int, body: NoteIn, db: Session = Depends(get_db),
+                  current_user: User = Depends(get_current_user)):
+    note = Note(entity_type="deal", entity_id=deal_id,
+                author_id=current_user.id, **body.model_dump())
     db.add(note)
     db.commit()
     db.refresh(note)
@@ -487,18 +519,20 @@ def get_case(case_id: int, db: Session = Depends(get_db)):
     return case
 
 @app.post("/cases", response_model=CaseOut, status_code=201)
-def create_case(body: CaseIn, created_by: int, db: Session = Depends(get_db)):
-    case = Case(created_by=created_by, **body.model_dump())
+def create_case(body: CaseIn, db: Session = Depends(get_db),
+                current_user: User = Depends(get_current_user)):
+    case = Case(created_by=current_user.id, **body.model_dump())
     db.add(case)
     db.flush()
-    _timeline(db, case.account_id, "case", case.id, created_by,
+    _timeline(db, case.account_id, "case", case.id, current_user.id,
               "case_opened", f"Case opened: {case.subject}")
     db.commit()
     db.refresh(case)
     return case
 
 @app.patch("/cases/{case_id}", response_model=CaseOut)
-def update_case(case_id: int, body: CaseUpdate, actor_id: int, db: Session = Depends(get_db)):
+def update_case(case_id: int, body: CaseUpdate, db: Session = Depends(get_db),
+                current_user: User = Depends(get_current_user)):
     case = db.get(Case, case_id)
     if not case:
         raise HTTPException(404, "Case not found")
@@ -506,7 +540,7 @@ def update_case(case_id: int, body: CaseUpdate, actor_id: int, db: Session = Dep
         setattr(case, field, value)
     if body.status in ("resolved", "closed") and not case.resolved_at:
         case.resolved_at = datetime.utcnow()
-        _timeline(db, case.account_id, "case", case.id, actor_id,
+        _timeline(db, case.account_id, "case", case.id, current_user.id,
                   f"case_{body.status}", f"Case {body.status}: {case.subject}")
     db.commit()
     db.refresh(case)
@@ -520,8 +554,10 @@ def case_notes(case_id: int, db: Session = Depends(get_db)):
               .all())
 
 @app.post("/cases/{case_id}/notes", response_model=NoteOut, status_code=201)
-def add_case_note(case_id: int, body: NoteIn, author_id: int, db: Session = Depends(get_db)):
-    note = Note(entity_type="case", entity_id=case_id, author_id=author_id, **body.model_dump())
+def add_case_note(case_id: int, body: NoteIn, db: Session = Depends(get_db),
+                  current_user: User = Depends(get_current_user)):
+    note = Note(entity_type="case", entity_id=case_id,
+                author_id=current_user.id, **body.model_dump())
     db.add(note)
     db.commit()
     db.refresh(note)
@@ -542,15 +578,17 @@ def get_catalog_item(item_id: int, db: Session = Depends(get_db)):
     return item
 
 @app.post("/catalog", response_model=CatalogItemOut, status_code=201)
-def create_catalog_item(body: CatalogItemIn, created_by: int, db: Session = Depends(get_db)):
-    item = CatalogItem(created_by=created_by, **body.model_dump())
+def create_catalog_item(body: CatalogItemIn, db: Session = Depends(get_db),
+                         current_user: User = Depends(require_role("finance"))):
+    item = CatalogItem(created_by=current_user.id, **body.model_dump())
     db.add(item)
     db.commit()
     db.refresh(item)
     return item
 
 @app.patch("/catalog/{item_id}/retire", response_model=CatalogItemOut)
-def retire_catalog_item(item_id: int, db: Session = Depends(get_db)):
+def retire_catalog_item(item_id: int, db: Session = Depends(get_db),
+                         current_user: User = Depends(require_role("finance"))):
     item = db.get(CatalogItem, item_id)
     if not item:
         raise HTTPException(404, "Catalog item not found")
@@ -578,15 +616,17 @@ def get_offer_lines(offer_id: int, db: Session = Depends(get_db)):
     return db.query(OfferLineItem).filter_by(offer_id=offer_id).all()
 
 @app.post("/offers", response_model=OfferOut, status_code=201)
-def create_offer(body: OfferIn, created_by: int, db: Session = Depends(get_db)):
-    offer = Offer(created_by=created_by, **body.model_dump())
+def create_offer(body: OfferIn, db: Session = Depends(get_db),
+                 current_user: User = Depends(get_current_user)):
+    offer = Offer(created_by=current_user.id, **body.model_dump())
     db.add(offer)
     db.commit()
     db.refresh(offer)
     return offer
 
 @app.post("/offers/{offer_id}/lines", response_model=OfferLineItemOut, status_code=201)
-def add_offer_line(offer_id: int, body: OfferLineItemIn, db: Session = Depends(get_db)):
+def add_offer_line(offer_id: int, body: OfferLineItemIn, db: Session = Depends(get_db),
+                   current_user: User = Depends(get_current_user)):
     offer = db.get(Offer, offer_id)
     if not offer:
         raise HTTPException(404, "Offer not found")
@@ -609,13 +649,14 @@ def add_offer_line(offer_id: int, body: OfferLineItemIn, db: Session = Depends(g
     return line
 
 @app.post("/offers/{offer_id}/submit", response_model=OfferOut)
-def submit_offer(offer_id: int, body: OfferSubmit, db: Session = Depends(get_db)):
+def submit_offer(offer_id: int, body: OfferSubmit, db: Session = Depends(get_db),
+                 current_user: User = Depends(get_current_user)):
     offer = db.get(Offer, offer_id)
     if not offer:
         raise HTTPException(404, "Offer not found")
     if offer.status != "draft":
         raise HTTPException(400, f"Cannot submit offer in status '{offer.status}'")
-    offer.discount_pct          = body.discount_pct
+    offer.discount_pct           = body.discount_pct
     offer.discount_justification = body.discount_justification
     _recalc_offer(offer, db)
     if body.discount_pct > 0:
@@ -625,48 +666,50 @@ def submit_offer(offer_id: int, body: OfferSubmit, db: Session = Depends(get_db)
     else:
         offer.status    = "locked"
         offer.locked_at = datetime.utcnow()
-    _timeline(db, offer.account_id, "offer", offer.id, body.created_by,
+    _timeline(db, offer.account_id, "offer", offer.id, current_user.id,
               "offer_submitted", f"Offer v{offer.version} submitted ({offer.status})")
     db.commit()
     db.refresh(offer)
     return offer
 
 @app.post("/offers/{offer_id}/approve", response_model=OfferOut)
-def approve_offer(offer_id: int, body: OfferApprove, db: Session = Depends(get_db)):
+def approve_offer(offer_id: int, db: Session = Depends(get_db),
+                  current_user: User = Depends(require_role("sm", "finance"))):
     offer = db.get(Offer, offer_id)
     if not offer:
         raise HTTPException(404, "Offer not found")
     if offer.status == "pending_sm":
-        offer.status           = "pending_finance"
-        offer.sm_approver_id   = body.approver_id
-        offer.sm_approved_at   = datetime.utcnow()
+        offer.status         = "pending_finance"
+        offer.sm_approver_id = current_user.id
+        offer.sm_approved_at = datetime.utcnow()
         summary = f"Offer v{offer.version} approved by SM — sent to Finance"
     elif offer.status == "pending_finance":
-        offer.status                = "locked"
-        offer.finance_approver_id   = body.approver_id
-        offer.finance_approved_at   = datetime.utcnow()
-        offer.locked_at             = datetime.utcnow()
+        offer.status              = "locked"
+        offer.finance_approver_id = current_user.id
+        offer.finance_approved_at = datetime.utcnow()
+        offer.locked_at           = datetime.utcnow()
         summary = f"Offer v{offer.version} approved by Finance — locked"
     else:
         raise HTTPException(400, f"Offer in status '{offer.status}' cannot be approved")
-    _timeline(db, offer.account_id, "offer", offer.id, body.approver_id,
+    _timeline(db, offer.account_id, "offer", offer.id, current_user.id,
               "offer_approved", summary)
     db.commit()
     db.refresh(offer)
     return offer
 
 @app.post("/offers/{offer_id}/reject", response_model=OfferOut)
-def reject_offer(offer_id: int, body: OfferReject, db: Session = Depends(get_db)):
+def reject_offer(offer_id: int, body: OfferReject, db: Session = Depends(get_db),
+                 current_user: User = Depends(require_role("sm", "finance"))):
     offer = db.get(Offer, offer_id)
     if not offer:
         raise HTTPException(404, "Offer not found")
     if offer.status not in ("pending_sm", "pending_finance"):
         raise HTTPException(400, f"Offer in status '{offer.status}' cannot be rejected")
     offer.status           = "rejected"
-    offer.rejected_by      = body.rejector_id
+    offer.rejected_by      = current_user.id
     offer.rejection_reason = body.reason
     offer.rejected_at      = datetime.utcnow()
-    _timeline(db, offer.account_id, "offer", offer.id, body.rejector_id,
+    _timeline(db, offer.account_id, "offer", offer.id, current_user.id,
               "offer_rejected", f"Offer v{offer.version} rejected: {body.reason}")
     db.commit()
     db.refresh(offer)
@@ -676,14 +719,16 @@ def reject_offer(offer_id: int, body: OfferReject, db: Session = Depends(get_db)
 # ── Notifications ─────────────────────────────────────────────────────────────
 
 @app.get("/notifications", response_model=list[NotificationOut])
-def get_notifications(user_id: int, db: Session = Depends(get_db)):
+def get_notifications(db: Session = Depends(get_db),
+                      current_user: User = Depends(get_current_user)):
     return (db.query(Notification)
-              .filter_by(user_id=user_id, is_read=False)
+              .filter_by(user_id=current_user.id, is_read=False)
               .order_by(Notification.created_at.desc())
               .all())
 
 @app.patch("/notifications/{notification_id}/read", response_model=NotificationOut)
-def mark_read(notification_id: int, db: Session = Depends(get_db)):
+def mark_read(notification_id: int, db: Session = Depends(get_db),
+              current_user: User = Depends(get_current_user)):
     n = db.get(Notification, notification_id)
     if not n:
         raise HTTPException(404, "Notification not found")
