@@ -5,6 +5,7 @@ const links = [
   { to: '/accounts', label: 'Accounts' },
   { to: '/deals', label: 'Deal Pipeline' },
   { to: '/cases', label: 'Cases' },
+  { to: '/tam', label: 'TAM Dashboard' },
   { to: '/offers', label: 'Offers' },
 ]
 

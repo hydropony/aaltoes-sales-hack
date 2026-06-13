@@ -6,6 +6,7 @@ import AccountDetail from './pages/AccountDetail'
 import Deals from './pages/Deals'
 import Cases from './pages/Cases'
 import CaseDetail from './pages/CaseDetail'
+import TAMDashboard from './pages/TAMDashboard'
 import Offers from './pages/Offers'
 
 export default function App() {
@@ -19,6 +20,7 @@ export default function App() {
           <Route path="deals" element={<Deals />} />
           <Route path="cases" element={<Cases />} />
           <Route path="cases/:id" element={<CaseDetail />} />
+          <Route path="tam" element={<TAMDashboard />} />
           <Route path="offers" element={<Offers />} />
         </Route>
       </Routes>
