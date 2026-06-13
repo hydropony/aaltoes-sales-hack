@@ -3,11 +3,12 @@ import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { api } from '@/lib/api'
 
-const emptyCase = { account_id: '', subject: '', description: '', priority: 'medium', service_id: '' }
+const emptyCase = { account_id: '', subject: '', description: '', priority: 'medium', service_id: '', customer_contact_id: '' }
 
 function CreateCaseModal({ onClose, onSaved }) {
   const [form, setForm] = useState(emptyCase)
   const [accounts, setAccounts] = useState([])
+  const [contacts, setContacts] = useState([])
   const [services, setServices] = useState([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
@@ -16,6 +17,14 @@ function CreateCaseModal({ onClose, onSaved }) {
     api.getAccounts().then(setAccounts).catch(console.error)
     api.getCatalog().then((items) => setServices(items.filter((i) => i.item_type === 'service'))).catch(console.error)
   }, [])
+
+  useEffect(() => {
+    setContacts([])
+    set('customer_contact_id', '')
+    if (form.account_id) {
+      api.getAccountContacts(form.account_id).then(setContacts).catch(console.error)
+    }
+  }, [form.account_id])
 
   function set(field, value) {
     setForm((f) => ({ ...f, [field]: value }))
@@ -33,6 +42,7 @@ function CreateCaseModal({ onClose, onSaved }) {
         ...form,
         account_id: Number(form.account_id),
         service_id: form.service_id ? Number(form.service_id) : null,
+        customer_contact_id: form.customer_contact_id ? Number(form.customer_contact_id) : null,
       })
       onSaved()
       onClose()
@@ -53,6 +63,13 @@ function CreateCaseModal({ onClose, onSaved }) {
             <select className="w-full border rounded-md px-3 py-2 text-sm bg-background" value={form.account_id} onChange={(e) => set('account_id', e.target.value)}>
               <option value="">Select account...</option>
               {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">Contact</label>
+            <select className="w-full border rounded-md px-3 py-2 text-sm bg-background" value={form.customer_contact_id} onChange={(e) => set('customer_contact_id', e.target.value)} disabled={!form.account_id}>
+              <option value="">{form.account_id ? 'Select contact...' : 'Select account first'}</option>
+              {contacts.map((c) => <option key={c.id} value={c.id}>{c.first_name} {c.last_name}</option>)}
             </select>
           </div>
           <div>
