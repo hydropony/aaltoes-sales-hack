@@ -141,12 +141,12 @@ Backend is the shared foundation. All routes are live at `http://localhost:8000/
 > Rep / TAM / SM / Finance. Each lands on the right default view on login.
 > **Auth approach: fake auth (no Azure AD).** User switcher dropdown in the nav lets you pick any seeded user. Selected user stored in `localStorage`, sent as `X-User-ID` header on every request. Backend reads the header to identify the current user and enforce role checks.
 
-- [ ] User switcher dropdown in nav (lists all users from `GET /users`, shows name + role)
-- [ ] Store selected `user_id` in `localStorage` on pick
-- [ ] Attach `X-User-ID` header to every API call (set in a central API client/fetch wrapper)
-- [ ] On app load, read `localStorage` → redirect to role default view
-- [ ] Route guard — redirect unauthenticated users to the user picker
-- [ ] API middleware — role check on write routes (catalog write: finance only, offer approval: sm/finance only)
+- [x] User switcher dropdown in nav (lists all users from `GET /users`, shows name + role)
+- [x] Store selected `user_id` in `localStorage` on pick
+- [x] Attach `X-User-ID` header to every API call (set in a central API client/fetch wrapper)
+- [x] On app load, read `localStorage` → redirect to role default view
+- [x] Route guard — redirect unauthenticated users to the user picker
+- [x] API middleware — role check on write routes (catalog write: finance only, offer approval: sm/finance only)
 
 ### 9 · Finance + Manager dashboards
 > Weighted pipeline, time-phased forecast, team pipeline.

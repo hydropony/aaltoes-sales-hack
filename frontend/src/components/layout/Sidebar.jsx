@@ -9,7 +9,7 @@ const links = [
   { to: '/offers', label: 'Offers' },
 ]
 
-export default function Sidebar() {
+export default function Sidebar({ currentUser, onSignOut }) {
   return (
     <aside className="w-56 min-h-screen bg-sidebar border-r border-sidebar-border flex flex-col">
       <div className="px-6 py-5 border-b border-sidebar-border">
@@ -33,6 +33,21 @@ export default function Sidebar() {
           </NavLink>
         ))}
       </nav>
+      <div className="border-t border-sidebar-border p-4 space-y-2">
+        <div className="text-sm text-sidebar-foreground">
+          <div className="font-medium">{currentUser?.full_name ?? 'No user selected'}</div>
+          <div className="text-xs text-muted-foreground capitalize">{currentUser?.role ?? 'signed out'}</div>
+        </div>
+        {currentUser && (
+          <button
+            type="button"
+            onClick={onSignOut}
+            className="w-full px-3 py-2 rounded-md text-sm font-medium bg-sidebar-accent text-sidebar-accent-foreground hover:opacity-90 transition-colors"
+          >
+            Sign out
+          </button>
+        )}
+      </div>
     </aside>
   )
 }

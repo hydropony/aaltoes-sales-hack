@@ -1,7 +1,9 @@
+import { clearStoredUserId, getStoredUserId, setStoredUserId } from './auth'
+
 const BASE = 'http://localhost:8000'
 
 function getUserId() {
-  return localStorage.getItem('user_id') || '1'
+  return getStoredUserId()
 }
 
 async function request(path, options = {}) {
@@ -9,7 +11,7 @@ async function request(path, options = {}) {
     ...options,
     headers: {
       'Content-Type': 'application/json',
-      'X-User-ID': getUserId(),
+      ...(getUserId() ? { 'X-User-ID': getUserId() } : {}),
       ...options.headers,
     },
   })
@@ -18,6 +20,12 @@ async function request(path, options = {}) {
 }
 
 export const api = {
+  getAuthUsers: () => fetch(`${BASE}/auth/users`).then(async (res) => {
+    if (!res.ok) throw new Error(await res.text())
+    return res.json()
+  }),
+  getMe: () => request('/auth/me'),
+
   // Accounts
   getAccounts: () => request('/accounts'),
   getAccount: (id) => request(`/accounts/${id}`),
@@ -40,6 +48,10 @@ export const api = {
 
   // Users
   getUsers: () => request('/users'),
+
+  // Session
+  setUserId: (userId) => setStoredUserId(userId),
+  clearUserId: () => clearStoredUserId(),
 
   // Catalog (for service dropdown)
   getCatalog: () => request('/catalog'),

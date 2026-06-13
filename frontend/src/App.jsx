@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { BrowserRouter, Navigate, Outlet, Route, Routes, useNavigate } from 'react-router-dom'
 import Layout from './components/layout/Layout'
 import Dashboard from './pages/Dashboard'
 import Accounts from './pages/Accounts'
@@ -8,22 +9,150 @@ import Cases from './pages/Cases'
 import CaseDetail from './pages/CaseDetail'
 import TAMDashboard from './pages/TAMDashboard'
 import Offers from './pages/Offers'
+import { api } from './lib/api'
+import { clearStoredUserId, getStoredUserId, setStoredUserId } from './lib/auth'
 
 export default function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Layout />}>
-          <Route index element={<Dashboard />} />
-          <Route path="accounts" element={<Accounts />} />
-          <Route path="accounts/:id" element={<AccountDetail />} />
-          <Route path="deals" element={<Deals />} />
-          <Route path="cases" element={<Cases />} />
-          <Route path="cases/:id" element={<CaseDetail />} />
-          <Route path="tam" element={<TAMDashboard />} />
-          <Route path="offers" element={<Offers />} />
-        </Route>
-      </Routes>
+      <AppShell />
     </BrowserRouter>
+  )
+}
+
+function AppShell() {
+  const [users, setUsers] = useState([])
+  const [loadingUsers, setLoadingUsers] = useState(true)
+  const [selectedUserId, setSelectedUserId] = useState(getStoredUserId() ?? '')
+  const [currentUser, setCurrentUser] = useState(null)
+  const [error, setError] = useState('')
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    let active = true
+    api.getAuthUsers()
+      .then((data) => {
+        if (!active) return
+        setUsers(data)
+      })
+      .catch((err) => {
+        if (!active) return
+        setError(err.message)
+      })
+      .finally(() => {
+        if (!active) return
+        setLoadingUsers(false)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [])
+
+  useEffect(() => {
+    const storedUserId = getStoredUserId()
+    if (!storedUserId) {
+      setCurrentUser(null)
+      return
+    }
+
+    api.getMe()
+      .then(setCurrentUser)
+      .catch(() => {
+        clearStoredUserId()
+        setCurrentUser(null)
+      })
+  }, [])
+
+  const defaultPath = useMemo(() => {
+    if (!currentUser) return '/'
+    if (currentUser.role === 'tam') return '/tam'
+    if (currentUser.role === 'rep') return '/accounts'
+    return '/'
+  }, [currentUser])
+
+  useEffect(() => {
+    if (!currentUser) return
+    navigate(defaultPath, { replace: true })
+  }, [currentUser, defaultPath, navigate])
+
+  async function handleSelectUser(event) {
+    const userId = event.target.value
+    if (!userId) return
+
+    setSelectedUserId(userId)
+    setStoredUserId(userId)
+    setError('')
+
+    try {
+      const session = await api.getMe()
+      setCurrentUser(session)
+    } catch (err) {
+      clearStoredUserId()
+      setCurrentUser(null)
+      setError(err.message)
+    }
+  }
+
+  function handleSignOut() {
+    clearStoredUserId()
+    setCurrentUser(null)
+    setSelectedUserId('')
+    navigate('/', { replace: true })
+  }
+
+  return currentUser ? (
+    <Routes>
+      <Route
+        path="/"
+        element={<Layout currentUser={currentUser} onSignOut={handleSignOut} />}
+      >
+        <Route index element={<Dashboard />} />
+        <Route path="accounts" element={<Accounts />} />
+        <Route path="accounts/:id" element={<AccountDetail />} />
+        <Route path="deals" element={<Deals />} />
+        <Route path="cases" element={<Cases />} />
+        <Route path="cases/:id" element={<CaseDetail />} />
+        <Route path="tam" element={<TAMDashboard />} />
+        <Route path="offers" element={<Offers />} />
+        <Route path="*" element={<Navigate to={defaultPath} replace />} />
+      </Route>
+    </Routes>
+  ) : (
+    <AuthGate
+      users={users}
+      loadingUsers={loadingUsers}
+      selectedUserId={selectedUserId}
+      onSelectUser={handleSelectUser}
+      error={error}
+    />
+  )
+}
+
+function AuthGate({ users, loadingUsers, selectedUserId, onSelectUser, error }) {
+  return (
+    <main className="min-h-screen flex items-center justify-center p-8 bg-background">
+      <div className="w-full max-w-md rounded-xl border bg-card p-6 shadow-sm">
+        <h1 className="text-2xl font-semibold mb-2">Select a user</h1>
+        <p className="text-sm text-muted-foreground mb-6">Pick a seeded CRM user to continue.</p>
+        <label className="text-xs text-muted-foreground mb-2 block" htmlFor="user-picker">User</label>
+        <select
+          id="user-picker"
+          className="w-full border rounded-md px-3 py-2 text-sm bg-background"
+          value={selectedUserId}
+          onChange={onSelectUser}
+          disabled={loadingUsers}
+        >
+          <option value="">Select user...</option>
+          {users.map((user) => (
+            <option key={user.id} value={user.id}>
+              {user.full_name} · {user.role}
+            </option>
+          ))}
+        </select>
+        {error && <p className="text-destructive text-sm mt-4">{error}</p>}
+        {loadingUsers && <p className="text-muted-foreground text-sm mt-4">Loading users...</p>}
+      </div>
+    </main>
   )
 }
