@@ -28,6 +28,8 @@ export default function TAMDashboard() {
         const sorted = mine.sort((a, b) => {
           if (a.status === 'resolved' && b.status !== 'resolved') return 1
           if (b.status === 'resolved' && a.status !== 'resolved') return -1
+          if (b.is_escalated && !a.is_escalated) return 1
+          if (a.is_escalated && !b.is_escalated) return -1
           const pd = (priorityOrder[a.priority] ?? 1) - (priorityOrder[b.priority] ?? 1)
           if (pd !== 0) return pd
           return daysSince(b.created_at) - daysSince(a.created_at)
