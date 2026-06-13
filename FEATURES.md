@@ -4,8 +4,8 @@
 
 | # | Feature | Owner | Backend | Frontend | Done |
 |---|---------|-------|---------|----------|------|
-| 1 | Account & contact management | P2 | ✅ | ⬜ | ⬜ |
-| 2 | Case management | P2 | ✅ | ⬜ | ⬜ |
+| 1 | Account & contact management | P2 | ✅ | 🚧 | ⬜ |
+| 2 | Case management | P2 | ✅ | 🚧 | ⬜ |
 | 3 | Deal pipeline + stages | P3 | ✅ | ⬜ | ⬜ |
 | 4 | Offer creation + storage | P3 | ✅ | ⬜ | ⬜ |
 | 5 | Offer approval workflow | P3 + P4 | ✅ | ⬜ | ⬜ |
@@ -13,7 +13,7 @@
 | 7 | Service catalog | P2 | ✅ | ⬜ | ⬜ |
 | 8 | Role-based access | P4 | ⬜ | ⬜ | ⬜ |
 | 9 | Personal dashboard (per role) | P2 + P3 + P4 | — | ⬜ | ⬜ |
-| 10 | Case & deal notes | P2 + P3 | ✅ | ⬜ | ⬜ |
+| 10 | Case & deal notes | P2 + P3 | ✅ | 🚧 | ⬜ |
 
 **Legend:** ✅ done · ⬜ not started · 🚧 in progress · — not applicable
 
@@ -41,20 +41,20 @@ Backend is the shared foundation. All routes are live at `http://localhost:8000/
 ### 1 · Account & contact management
 > Accounts hold contacts, deals, cases, activity timeline.
 
-- [ ] Account list page (name, status, region, owner)
-- [ ] Account detail page — tabbed: Overview / Deals / Cases / Timeline / Notes
-- [ ] Contacts list on account detail
+- [x] Account list page (name, status, region, owner)
+- [x] Account detail page — tabbed: Overview / Deals / Cases / Timeline / Notes
+- [x] Contacts list on account detail
 - [ ] Add contact form
 
 ### 2 · Case management
 > Status, priority, linked service, threaded notes.
 
-- [ ] Case list on account detail (sorted by priority + age)
+- [x] Case list (sorted by priority + age)
 - [ ] TAM dashboard: all assigned cases, sorted by priority + age
 - [ ] Create case form (subject, description, priority, contact, service)
-- [ ] Case detail: status badge, priority, escalation flag, third-party ref
-- [ ] Update case status / priority (PATCH `/cases/{id}`)
-- [ ] Threaded notes on case detail
+- [x] Case detail: status badge, priority, escalation flag
+- [x] Update case status (PATCH `/cases/{id}`)
+- [x] Threaded notes on case detail
 
 ### 7 · Service catalog (read-only, cases)
 > Cases link to a service.
@@ -65,13 +65,14 @@ Backend is the shared foundation. All routes are live at `http://localhost:8000/
 > TAM lands on their open cases sorted by priority + age.
 
 - [ ] Default view for role `tam`: assigned cases, open/escalated first
-- [ ] Case age indicator (days since opened)
+- [x] Case age indicator (days since opened)
 
 ### 10 · Case & deal notes (case side)
 > Timestamped, visible to everyone with access.
 
-- [ ] Note thread on case detail (author, timestamp, note_type badge)
-- [ ] Add note form (body + note_type picker)
+- [x] Note thread on case detail (timestamp)
+- [x] Add note form (body)
+- [ ] note_type badge + picker
 
 ---
 
