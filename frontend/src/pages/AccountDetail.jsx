@@ -84,6 +84,7 @@ export default function AccountDetail() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [noteBody, setNoteBody] = useState('')
+  const [noteType, setNoteType] = useState('general')
   const [showAddContact, setShowAddContact] = useState(false)
 
   useEffect(() => {
@@ -104,8 +105,9 @@ export default function AccountDetail() {
 
   async function submitNote() {
     if (!noteBody.trim()) return
-    await api.createAccountNote(id, { body: noteBody, note_type: 'general' })
+    await api.createAccountNote(id, { body: noteBody, note_type: noteType })
     setNoteBody('')
+    setNoteType('general')
     api.getAccountNotes(id).then(setData)
   }
 
@@ -268,12 +270,28 @@ export default function AccountDetail() {
               value={noteBody}
               onChange={(e) => setNoteBody(e.target.value)}
             />
+            <select
+              className="border rounded-md px-3 py-2 text-sm bg-background"
+              value={noteType}
+              onChange={(e) => setNoteType(e.target.value)}
+            >
+              <option value="general">General</option>
+              <option value="internal">Internal</option>
+              <option value="working">Working</option>
+            </select>
             <Button onClick={submitNote}>Add</Button>
           </div>
           <div className="flex flex-col gap-3">
             {(data ?? []).map((n) => (
               <div key={n.id} className="rounded-lg border bg-card p-4 text-sm">
-                <p className="text-muted-foreground text-xs mb-1">{new Date(n.created_at).toLocaleString()}</p>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-muted-foreground text-xs">{new Date(n.created_at).toLocaleString()}</span>
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${
+                    n.note_type === 'working' ? 'bg-blue-100 text-blue-800' :
+                    n.note_type === 'internal' ? 'bg-yellow-100 text-yellow-800' :
+                    'bg-muted text-muted-foreground'
+                  }`}>{n.note_type}</span>
+                </div>
                 <p>{n.body}</p>
               </div>
             ))}
