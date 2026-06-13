@@ -21,8 +21,27 @@ cd backend
 uv init
 
 # Install dependencies
-uv add fastapi "uvicorn[standard]"
+uv add fastapi "uvicorn[standard]" sqlalchemy
 ```
+
+### Database setup
+
+Create the SQLite database and populate it with demo data:
+
+```bash
+uv run python database.py   # creates crm.db with all tables
+uv run python seed.py       # populates with realistic demo data
+```
+
+This seeds the database with:
+- 4 users: `alice` (rep), `bob` (tam), `carol` (sm), `dave` (finance)
+- 6 accounts: Nokia, KONE, Wärtsilä, Fortum, Stora Enso, Neste
+- 6 deals across all pipeline stages (including one stale deal and one won)
+- 2 offers: Nokia pending Finance approval, KONE draft
+- 3 cases: Nokia critical/in-progress, KONE high/open, Wärtsilä resolved
+- Forecast months, notes, timeline events, and notifications
+
+The database file `crm.db` is created in the `backend/` directory.
 
 ### Run the dev server
 
