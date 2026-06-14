@@ -151,6 +151,7 @@ class NoteIn(BaseModel):
 class CaseOut(ORM):
     id: int
     account_id: int
+    account_name: Optional[str] = None
     tam_id: Optional[int] = None
     subject: str
     description: Optional[str] = None
@@ -507,16 +508,21 @@ def add_deal_note(deal_id: int, body: NoteIn, db: Session = Depends(get_db),
 
 # ── Cases ─────────────────────────────────────────────────────────────────────
 
+def _case_out(case: Case) -> CaseOut:
+    out = CaseOut.model_validate(case)
+    out.account_name = case.account.name if case.account else None
+    return out
+
 @app.get("/cases", response_model=list[CaseOut])
 def list_cases(db: Session = Depends(get_db)):
-    return db.query(Case).all()
+    return [_case_out(c) for c in db.query(Case).all()]
 
 @app.get("/cases/{case_id}", response_model=CaseOut)
 def get_case(case_id: int, db: Session = Depends(get_db)):
     case = db.get(Case, case_id)
     if not case:
         raise HTTPException(404, "Case not found")
-    return case
+    return _case_out(case)
 
 @app.post("/cases", response_model=CaseOut, status_code=201)
 def create_case(body: CaseIn, db: Session = Depends(get_db),

@@ -107,9 +107,22 @@ function CreateCaseModal({ onClose, onSaved }) {
 }
 
 const priorityColors = {
+  critical: 'bg-destructive text-destructive-foreground font-semibold',
   high: 'bg-destructive/10 text-destructive',
   medium: 'bg-yellow-100 text-yellow-800',
   low: 'bg-muted text-muted-foreground',
+}
+
+const statusColors = {
+  open: 'bg-blue-100 text-blue-800',
+  in_progress: 'bg-yellow-100 text-yellow-800',
+  escalated: 'bg-orange-100 text-orange-800',
+  resolved: 'bg-green-100 text-green-800',
+  closed: 'bg-muted text-muted-foreground',
+}
+
+function fmtStatus(s) {
+  return s.replace(/_/g, ' ')
 }
 
 function daysSince(dateStr) {
@@ -155,6 +168,7 @@ export default function Cases() {
             <thead className="border-b bg-muted/50">
               <tr>
                 <th className="text-left px-4 py-3 font-medium">Subject</th>
+                <th className="text-left px-4 py-3 font-medium">Company</th>
                 <th className="text-left px-4 py-3 font-medium">Priority</th>
                 <th className="text-left px-4 py-3 font-medium">Status</th>
                 <th className="text-left px-4 py-3 font-medium">Age</th>
@@ -164,17 +178,22 @@ export default function Cases() {
               {sorted.map((c) => (
                 <tr key={c.id} onClick={() => navigate(`/cases/${c.id}`)} className="border-b last:border-0 hover:bg-muted/30 cursor-pointer">
                   <td className="px-4 py-3 font-medium text-foreground">{c.subject}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{c.account_name ?? '—'}</td>
                   <td className="px-4 py-3">
                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${priorityColors[c.priority] ?? ''}`}>
                       {c.priority}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-muted-foreground capitalize">{c.status}</td>
+                  <td className="px-4 py-3">
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${statusColors[c.status] ?? 'bg-muted text-muted-foreground'}`}>
+                      {fmtStatus(c.status)}
+                    </span>
+                  </td>
                   <td className="px-4 py-3 text-muted-foreground">{daysSince(c.created_at)}d</td>
                 </tr>
               ))}
               {sorted.length === 0 && (
-                <tr><td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">No cases found.</td></tr>
+                <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">No cases found.</td></tr>
               )}
             </tbody>
           </table>
