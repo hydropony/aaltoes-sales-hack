@@ -37,6 +37,7 @@ export const api = {
   getAccountTimeline: (id) => request(`/accounts/${id}/timeline`),
   getAccountNotes: (id) => request(`/accounts/${id}/notes`),
   createAccountNote: (id, data) => request(`/accounts/${id}/notes`, { method: 'POST', body: JSON.stringify(data) }),
+  getAccountOffers: (id) => request(`/accounts/${id}/offers`),
 
   // Cases
   getCases: () => request('/cases'),

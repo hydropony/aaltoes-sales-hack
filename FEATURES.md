@@ -7,7 +7,7 @@
 | 1 | Account & contact management | P2 | ✅ | ✅ | ✅ |
 | 2 | Case management | P2 | ✅ | ✅ | ✅ |
 | 3 | Deal pipeline + stages | P3 | ✅ | ✅ | ✅ |
-| 4 | Offer creation + storage | P3 | ✅ | 🚧 | ⬜ |
+| 4 | Offer creation + storage | P3 | ✅ | ✅ | ✅ |
 | 5 | Offer approval workflow | P3 + P4 | ✅ | ✅ | ✅ |
 | 6 | Product + pricing catalog | P4 | ✅ | ✅ | ✅ |
 | 7 | Service catalog | P2 | ✅ | ✅ | ✅ |
@@ -77,7 +77,7 @@
 - [x] Offer builder: pick catalog items, set quantity + per-line discount
 - [x] Line total + offer subtotal calculated client-side
 - [x] Offer list page (wired to real API, role-aware approval queue banner)
-- [ ] **Offers tab on account detail** — list offers linked to the account
+- [x] Offers tab on account detail — deal, version, total, status, created, View button
 
 ### 5 · Offer approval workflow ✅
 - [x] Submit offer form — discount %, justification required if discount > 0

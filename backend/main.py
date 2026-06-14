@@ -390,7 +390,11 @@ def account_deals(account_id: int, db: Session = Depends(get_db)):
 
 @app.get("/accounts/{account_id}/cases", response_model=list[CaseOut])
 def account_cases(account_id: int, db: Session = Depends(get_db)):
-    return db.query(Case).filter_by(account_id=account_id).all()
+    return [_case_out(c) for c in db.query(Case).filter_by(account_id=account_id).all()]
+
+@app.get("/accounts/{account_id}/offers", response_model=list[OfferOut])
+def account_offers(account_id: int, db: Session = Depends(get_db)):
+    return [_offer_out(o) for o in db.query(Offer).filter_by(account_id=account_id).order_by(Offer.created_at.desc()).all()]
 
 @app.get("/accounts/{account_id}/timeline", response_model=list[TimelineEventOut])
 def account_timeline(account_id: int, db: Session = Depends(get_db)):

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { api } from '@/lib/api'
 import { useCurrentUser } from '@/lib/UserContext'
 
-const TABS = ['Overview', 'Contacts', 'Deals', 'Cases', 'Timeline', 'Notes']
+const TABS = ['Overview', 'Contacts', 'Deals', 'Cases', 'Offers', 'Timeline', 'Notes']
 
 const emptyContact = { first_name: '', last_name: '', email: '', phone: '', job_title: '', is_primary: false }
 
@@ -241,6 +241,7 @@ export default function AccountDetail() {
       Contacts: () => api.getAccountContacts(id),
       Deals: () => api.getAccountDeals(id),
       Cases: () => api.getAccountCases(id),
+      Offers: () => api.getAccountOffers(id),
       Notes: () => api.getAccountNotes(id),
     }
     if (fetchers[tab]) {
@@ -401,6 +402,55 @@ export default function AccountDetail() {
                 </tr>
               ))}
               {data?.length === 0 && <tr><td colSpan={3} className="px-4 py-6 text-center text-muted-foreground">No cases.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {tab === 'Offers' && (
+        <div className="rounded-lg border bg-card overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="border-b bg-muted/50">
+              <tr>
+                <th className="text-left px-4 py-3 font-medium">Deal</th>
+                <th className="text-left px-4 py-3 font-medium">Version</th>
+                <th className="text-right px-4 py-3 font-medium">Total</th>
+                <th className="text-left px-4 py-3 font-medium">Status</th>
+                <th className="text-left px-4 py-3 font-medium">Created</th>
+                <th className="px-4 py-3" />
+              </tr>
+            </thead>
+            <tbody>
+              {(data ?? []).map((o) => {
+                const statusCfg = {
+                  draft:           { label: 'Draft',            cls: 'bg-muted text-muted-foreground' },
+                  pending_sm:      { label: 'Awaiting SM',      cls: 'bg-blue-100 text-blue-800' },
+                  pending_finance: { label: 'Awaiting Finance', cls: 'bg-blue-100 text-blue-800' },
+                  locked:          { label: 'Approved',         cls: 'bg-green-100 text-green-800' },
+                  rejected:        { label: 'Rejected',         cls: 'bg-red-100 text-red-800' },
+                }[o.status] ?? { label: o.status, cls: 'bg-muted text-muted-foreground' }
+                return (
+                  <tr key={o.id} className="border-b last:border-0 hover:bg-muted/30 cursor-pointer" onClick={() => navigate(`/offers/${o.id}`)}>
+                    <td className="px-4 py-3 text-muted-foreground">{o.deal_name ?? '—'}</td>
+                    <td className="px-4 py-3 text-muted-foreground">v{o.version}</td>
+                    <td className="px-4 py-3 text-right tabular-nums font-medium">€{o.total_value.toLocaleString()}</td>
+                    <td className="px-4 py-3">
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusCfg.cls}`}>{statusCfg.label}</span>
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">{new Date(o.created_at).toLocaleDateString()}</td>
+                    <td className="px-4 py-3">
+                      <button
+                        className="text-xs px-3 py-1 rounded border hover:bg-muted transition-colors"
+                        onClick={(e) => { e.stopPropagation(); navigate(`/offers/${o.id}`) }}
+                      >
+                        View
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })}
+              {data?.length === 0 && <tr><td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">No offers.</td></tr>}
+              {!data && <tr><td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">Loading...</td></tr>}
             </tbody>
           </table>
         </div>
