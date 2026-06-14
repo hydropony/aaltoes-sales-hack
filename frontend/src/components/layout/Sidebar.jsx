@@ -1,15 +1,36 @@
 import { NavLink } from 'react-router-dom'
 
-const links = [
-  { to: '/', label: 'Dashboard' },
-  { to: '/accounts', label: 'Accounts' },
-  { to: '/deals', label: 'Deal Pipeline' },
-  { to: '/cases', label: 'Cases' },
-  { to: '/tam', label: 'TAM Dashboard' },
-  { to: '/offers', label: 'Offers' },
-]
+const NAV_BY_ROLE = {
+  rep: [
+    { to: '/rep',      label: 'My Dashboard' },
+    { to: '/accounts', label: 'Accounts' },
+    { to: '/pipeline', label: 'Pipeline' },
+    { to: '/offers',   label: 'Offers' },
+    { to: '/cases',    label: 'Cases' },
+  ],
+  tam: [
+    { to: '/tam',      label: 'My Dashboard' },
+    { to: '/accounts', label: 'Accounts' },
+    { to: '/cases',    label: 'Cases' },
+  ],
+  sm: [
+    { to: '/',         label: 'Dashboard' },
+    { to: '/accounts', label: 'Accounts' },
+    { to: '/pipeline', label: 'Pipeline' },
+    { to: '/offers',   label: 'Offers' },
+    { to: '/cases',    label: 'Cases' },
+    { to: '/deals',    label: 'Deals' },
+  ],
+  finance: [
+    { to: '/',         label: 'Dashboard' },
+    { to: '/offers',   label: 'Offers' },
+    { to: '/catalog',  label: 'Catalog' },
+  ],
+}
 
 export default function Sidebar({ currentUser, onSignOut }) {
+  const links = NAV_BY_ROLE[currentUser?.role] ?? []
+
   return (
     <aside className="w-56 min-h-screen bg-sidebar border-r border-sidebar-border flex flex-col">
       <div className="px-6 py-5 border-b border-sidebar-border">

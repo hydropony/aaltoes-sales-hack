@@ -71,8 +71,10 @@ function AppShell() {
 
   const defaultPath = useMemo(() => {
     if (!currentUser) return '/'
-    if (currentUser.role === 'tam') return '/tam'
-    if (currentUser.role === 'rep') return '/rep'
+    if (currentUser.role === 'rep')     return '/rep'
+    if (currentUser.role === 'tam')     return '/tam'
+    if (currentUser.role === 'sm')      return '/pipeline'
+    if (currentUser.role === 'finance') return '/offers'
     return '/'
   }, [currentUser])
 
