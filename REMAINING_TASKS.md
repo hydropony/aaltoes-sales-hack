@@ -29,24 +29,18 @@ features are incomplete in the current build.
   calling `api.updateCatalogItem` (`Catalog.jsx:48`) via an Edit/Cancel toggle.
 
 ### Service catalog — "Internal vs 3rd-party tag. Cases link to a service."
-- [ ] **Expose the `Service` table via the API.** There is no `GET /services` (or any
-  service CRUD) endpoint. The `Service` model (`service_type`, `provider_name`) is seeded
-  but otherwise orphaned. Add list/create/update endpoints so the internal-vs-3rd-party
-  distinction is actually usable.
-- [ ] 🐛 **Fix the case→service link.** `Cases.jsx:18` populates the service dropdown from
-  `GET /catalog` filtered to `item_type === 'service'` and sends that **catalog_item id**
-  as `service_id` (`Cases.jsx:44`). But `Case.service_id` is a FK to `services.id`, and the
-  seed links cases to `Service` rows (`seed.py:278`). The dropdown is sending IDs from the
-  wrong table — cases get linked to the wrong/nonexistent service. Point the dropdown at the
-  new `GET /services` endpoint and send the real `services.id`.
+- [x] ~~**Expose the `Service` table via the API.**~~ Done: added `GET /services`,
+  `GET /services/{id}`, `POST /services`, `PATCH /services/{id}` (`main.py`). Returns
+  `service_type` + `provider_name`.
+- [x] ~~🐛 **Fix the case→service link.**~~ Done: `Cases.jsx` now populates the dropdown from
+  `api.getServices()` and sends the real `services.id`. `CaseOut` also now carries
+  `service_id` + `service_name`. Verified end-to-end.
 
 ### Offer approval workflow — notifications
-- [ ] 🔴 **Generate notifications at runtime.** The brief scenario #08 requires "SM and
-  Finance both notified" on a discounted offer. The `Notification` model and
-  `GET/PATCH /notifications` exist, but **no route ever creates a Notification** (only
-  `seed.py` does). `submit_offer`, `approve_offer`, and `reject_offer` must insert
-  notifications for the next approver / the rep. Without this the bell is always empty in a
-  live demo.
+- [x] ~~🔴 **Generate notifications at runtime.**~~ Done: added `_notify`/`_users_by_role`
+  helpers and wired them into `submit_offer` (→ SMs), `approve_offer` (→ Finance + rep on SM
+  step, → rep on Finance lock), and `reject_offer` (→ rep). Verified end-to-end: SM, Finance,
+  and rep all receive the right notifications through the full approval chain.
 
 ### Deal pipeline — 3-yr time-phased forecast
 - [ ] **Allow forecast entry beyond 12 months.** P0 says "3-yr time-phased forecast."
@@ -120,9 +114,9 @@ features are incomplete in the current build.
 | Case management (P0) | 🟠 done except service-link bug |
 | Deal pipeline + stages (P0) | 🟠 done; forecast entry capped at 12mo |
 | Offer creation + storage (P0) | 🟠 Offers-on-account tab done; no versioning |
-| Offer approval workflow (P0) | 🔴 works, but no runtime notifications |
+| Offer approval workflow (P0) | ✅ approval + runtime notifications work |
 | Product + pricing catalog (P0) | ✅ add/edit/retire all work |
-| Service catalog (P0) | 🔴 no service endpoints + wrong-table link bug |
+| Service catalog (P0) | ✅ endpoints added + case link fixed |
 | Role-based access (P0) | ✅ (switcher, not SSO) |
 | Personal dashboards (P0) | ✅ done |
 | Case & deal notes (P0) | 🟠 done; visibility rules not enforced |

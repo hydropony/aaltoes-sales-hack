@@ -15,7 +15,7 @@ function CreateCaseModal({ onClose, onSaved }) {
 
   useEffect(() => {
     api.getAccounts().then(setAccounts).catch(console.error)
-    api.getCatalog().then((items) => setServices(items.filter((i) => i.item_type === 'service'))).catch(console.error)
+    api.getServices().then(setServices).catch(console.error)
   }, [])
 
   useEffect(() => {

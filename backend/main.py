@@ -152,6 +152,8 @@ class CaseOut(ORM):
     id: int
     account_id: int
     account_name: Optional[str] = None
+    service_id: Optional[int] = None
+    service_name: Optional[str] = None
     tam_id: Optional[int] = None
     subject: str
     description: Optional[str] = None
@@ -208,6 +210,31 @@ class CatalogItemUpdate(BaseModel):
     unit_price: Optional[float] = None
     invoicing_model: Optional[str] = None
     term_years: Optional[int] = None
+
+
+class ServiceOut(ORM):
+    id: int
+    name: str
+    description: Optional[str] = None
+    service_type: str
+    provider_name: Optional[str] = None
+    catalog_item_id: Optional[int] = None
+    is_active: bool
+
+class ServiceIn(BaseModel):
+    name: str
+    description: Optional[str] = None
+    service_type: str = "internal"
+    provider_name: Optional[str] = None
+    catalog_item_id: Optional[int] = None
+
+class ServiceUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    service_type: Optional[str] = None
+    provider_name: Optional[str] = None
+    catalog_item_id: Optional[int] = None
+    is_active: Optional[bool] = None
 
 
 class OfferLineItemOut(ORM):
@@ -304,6 +331,18 @@ def _timeline(db, account_id, entity_type, entity_id, actor_id, event_type, summ
         account_id=account_id, entity_type=entity_type, entity_id=entity_id,
         actor_id=actor_id, event_type=event_type, summary=summary, extra=extra,
     ))
+
+
+def _notify(db, user_id, title, body=None, entity_type=None, entity_id=None):
+    """Queue an in-app notification for a user (committed by the caller)."""
+    db.add(Notification(
+        user_id=user_id, title=title, body=body,
+        entity_type=entity_type, entity_id=entity_id,
+    ))
+
+
+def _users_by_role(db, role: str):
+    return db.query(User).filter_by(role=role, is_active=True).all()
 
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
@@ -524,6 +563,7 @@ def add_deal_note(deal_id: int, body: NoteIn, db: Session = Depends(get_db),
 def _case_out(case: Case) -> CaseOut:
     out = CaseOut.model_validate(case)
     out.account_name = case.account.name if case.account else None
+    out.service_name = case.service.name if case.service else None
     return out
 
 @app.get("/cases", response_model=list[CaseOut])
@@ -629,6 +669,41 @@ def retire_catalog_item(item_id: int, db: Session = Depends(get_db),
     return item
 
 
+# ── Services ──────────────────────────────────────────────────────────────────
+
+@app.get("/services", response_model=list[ServiceOut])
+def list_services(db: Session = Depends(get_db)):
+    return db.query(Service).filter_by(is_active=True).all()
+
+@app.get("/services/{service_id}", response_model=ServiceOut)
+def get_service(service_id: int, db: Session = Depends(get_db)):
+    service = db.get(Service, service_id)
+    if not service:
+        raise HTTPException(404, "Service not found")
+    return service
+
+@app.post("/services", response_model=ServiceOut, status_code=201)
+def create_service(body: ServiceIn, db: Session = Depends(get_db),
+                   current_user: User = Depends(get_current_user)):
+    service = Service(**body.model_dump())
+    db.add(service)
+    db.commit()
+    db.refresh(service)
+    return service
+
+@app.patch("/services/{service_id}", response_model=ServiceOut)
+def update_service(service_id: int, body: ServiceUpdate, db: Session = Depends(get_db),
+                   current_user: User = Depends(get_current_user)):
+    service = db.get(Service, service_id)
+    if not service:
+        raise HTTPException(404, "Service not found")
+    for field, value in body.model_dump(exclude_unset=True).items():
+        setattr(service, field, value)
+    db.commit()
+    db.refresh(service)
+    return service
+
+
 # ── Offers ────────────────────────────────────────────────────────────────────
 
 def _offer_out(offer: Offer) -> OfferOut:
@@ -696,10 +771,17 @@ def submit_offer(offer_id: int, body: OfferSubmit, db: Session = Depends(get_db)
     offer.discount_pct           = body.discount_pct
     offer.discount_justification = body.discount_justification
     _recalc_offer(offer, db)
+    account_name = offer.account.name if offer.account else f"Account #{offer.account_id}"
     if body.discount_pct > 0:
         if not body.discount_justification:
             raise HTTPException(400, "discount_justification required when discount_pct > 0")
         offer.status = "pending_sm"
+        for sm in _users_by_role(db, "sm"):
+            _notify(db, sm.id, "Offer awaiting SM approval",
+                    f"{account_name} — offer v{offer.version} "
+                    f"(€{offer.total_value:,.0f} after {offer.discount_pct:.0f}% discount) "
+                    f"needs your approval.",
+                    "offer", offer.id)
     else:
         offer.status    = "locked"
         offer.locked_at = datetime.utcnow()
@@ -715,17 +797,31 @@ def approve_offer(offer_id: int, db: Session = Depends(get_db),
     offer = db.get(Offer, offer_id)
     if not offer:
         raise HTTPException(404, "Offer not found")
+    account_name = offer.account.name if offer.account else f"Account #{offer.account_id}"
     if offer.status == "pending_sm":
         offer.status         = "pending_finance"
         offer.sm_approver_id = current_user.id
         offer.sm_approved_at = datetime.utcnow()
         summary = f"Offer v{offer.version} approved by SM — sent to Finance"
+        for fin in _users_by_role(db, "finance"):
+            _notify(db, fin.id, "Offer awaiting Finance approval",
+                    f"{account_name} — offer v{offer.version} (€{offer.total_value:,.0f}) "
+                    f"needs your final approval.",
+                    "offer", offer.id)
+        _notify(db, offer.created_by, "SM approved your offer",
+                f"{current_user.full_name} approved your offer for {account_name}. "
+                f"Awaiting Finance sign-off.",
+                "offer", offer.id)
     elif offer.status == "pending_finance":
         offer.status              = "locked"
         offer.finance_approver_id = current_user.id
         offer.finance_approved_at = datetime.utcnow()
         offer.locked_at           = datetime.utcnow()
         summary = f"Offer v{offer.version} approved by Finance — locked"
+        _notify(db, offer.created_by, "Offer approved & locked",
+                f"{current_user.full_name} (Finance) approved your offer for {account_name}. "
+                f"It is now locked.",
+                "offer", offer.id)
     else:
         raise HTTPException(400, f"Offer in status '{offer.status}' cannot be approved")
     _timeline(db, offer.account_id, "offer", offer.id, current_user.id,
@@ -746,6 +842,10 @@ def reject_offer(offer_id: int, body: OfferReject, db: Session = Depends(get_db)
     offer.rejected_by      = current_user.id
     offer.rejection_reason = body.reason
     offer.rejected_at      = datetime.utcnow()
+    account_name = offer.account.name if offer.account else f"Account #{offer.account_id}"
+    _notify(db, offer.created_by, "Offer rejected",
+            f"{current_user.full_name} rejected your offer for {account_name}: {body.reason}",
+            "offer", offer.id)
     _timeline(db, offer.account_id, "offer", offer.id, current_user.id,
               "offer_rejected", f"Offer v{offer.version} rejected: {body.reason}")
     db.commit()

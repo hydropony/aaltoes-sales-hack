@@ -74,6 +74,11 @@ export const api = {
   approveOffer: (id) => request(`/offers/${id}/approve`, { method: 'POST', body: JSON.stringify({}) }),
   rejectOffer: (id, reason) => request(`/offers/${id}/reject`, { method: 'POST', body: JSON.stringify({ reason }) }),
 
+  // Services
+  getServices: () => request('/services'),
+  createService: (data) => request('/services', { method: 'POST', body: JSON.stringify(data) }),
+  updateService: (id, data) => request(`/services/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+
   // Catalog
   getCatalog: () => request('/catalog'),
   createCatalogItem: (data) => request('/catalog', { method: 'POST', body: JSON.stringify(data) }),
