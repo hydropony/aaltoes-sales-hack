@@ -49,7 +49,7 @@ export default function CaseDetail() {
 
       <div className="flex items-start justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-semibold">{caseData.subject}</h1>
+          <h1 className="text-2xl font-semibold text-foreground">{caseData.subject}</h1>
           <p className="text-muted-foreground text-sm mt-1">{caseData.description}</p>
         </div>
         <div className="flex gap-2">

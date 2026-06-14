@@ -163,7 +163,7 @@ export default function Cases() {
             <tbody>
               {sorted.map((c) => (
                 <tr key={c.id} onClick={() => navigate(`/cases/${c.id}`)} className="border-b last:border-0 hover:bg-muted/30 cursor-pointer">
-                  <td className="px-4 py-3 font-medium">{c.subject}</td>
+                  <td className="px-4 py-3 font-medium text-foreground">{c.subject}</td>
                   <td className="px-4 py-3">
                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${priorityColors[c.priority] ?? ''}`}>
                       {c.priority}
