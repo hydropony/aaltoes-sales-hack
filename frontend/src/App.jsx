@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useNavigate } from 'react-router-dom'
 import Layout from './components/layout/Layout'
 import Dashboard from './pages/Dashboard'
@@ -23,6 +23,14 @@ export default function App() {
       <AppShell />
     </BrowserRouter>
   )
+}
+
+function defaultPathForRole(role) {
+  if (role === 'rep')     return '/rep'
+  if (role === 'tam')     return '/tam'
+  if (role === 'sm')      return '/pipeline'
+  if (role === 'finance') return '/offers'
+  return '/'
 }
 
 function AppShell() {
@@ -62,26 +70,15 @@ function AppShell() {
     }
 
     api.getMe()
-      .then(setCurrentUser)
+      .then((user) => {
+        setCurrentUser(user)
+        navigate(defaultPathForRole(user.role), { replace: true })
+      })
       .catch(() => {
         clearStoredUserId()
         setCurrentUser(null)
       })
-  }, [])
-
-  const defaultPath = useMemo(() => {
-    if (!currentUser) return '/'
-    if (currentUser.role === 'rep')     return '/rep'
-    if (currentUser.role === 'tam')     return '/tam'
-    if (currentUser.role === 'sm')      return '/pipeline'
-    if (currentUser.role === 'finance') return '/offers'
-    return '/'
-  }, [currentUser])
-
-  useEffect(() => {
-    if (!currentUser) return
-    navigate(defaultPath, { replace: true })
-  }, [currentUser, defaultPath, navigate])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleSelectUser(event) {
     const userId = event.target.value
@@ -94,6 +91,7 @@ function AppShell() {
     try {
       const session = await api.getMe()
       setCurrentUser(session)
+      navigate(defaultPathForRole(session.role), { replace: true })
     } catch (err) {
       clearStoredUserId()
       setCurrentUser(null)
@@ -127,7 +125,7 @@ function AppShell() {
         <Route path="offers" element={<Offers />} />
         <Route path="offers/new" element={<OfferBuilder />} />
         <Route path="offers/:id" element={<OfferDetail />} />
-        <Route path="*" element={<Navigate to={defaultPath} replace />} />
+        <Route path="*" element={<Navigate to={defaultPathForRole(currentUser?.role)} replace />} />
       </Route>
     </Routes>
   ) : (
