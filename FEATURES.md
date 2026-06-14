@@ -9,7 +9,7 @@
 | 3 | Deal pipeline + stages | P3 | ✅ | ✅ | ✅ |
 | 4 | Offer creation + storage | P3 | ✅ | 🚧 | ⬜ |
 | 5 | Offer approval workflow | P3 + P4 | ✅ | ✅ | ✅ |
-| 6 | Product + pricing catalog | P4 | ✅ | 🚧 | ⬜ |
+| 6 | Product + pricing catalog | P4 | ✅ | ✅ | ✅ |
 | 7 | Service catalog | P2 | ✅ | ✅ | ✅ |
 | 8 | Role-based access | P4 | ✅ | ✅ | ✅ |
 | 9 | Personal dashboard (per role) | P2 + P3 + P4 | — | ✅ | ✅ |
@@ -106,7 +106,7 @@
 - [x] Catalog list page (name, SKU, type, unit price, invoicing model)
 - [x] Add catalog item form (Finance role only)
 - [x] Backend `PATCH /catalog/{id}` for price/description edits
-- [ ] **Edit catalog item in UI** — inline or modal edit form (backend ready, frontend missing)
+- [x] Edit catalog item in UI — inline edit row (name, price, description, invoicing, term)
 - [x] Retire item — soft delete, removed from active list
 
 ### 8 · Role-based access ✅

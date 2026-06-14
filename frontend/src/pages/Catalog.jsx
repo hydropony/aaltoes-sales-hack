@@ -19,12 +19,114 @@ const invoicingLabels = {
   monthly_recurring: 'Monthly recurring',
 }
 
+function EditRow({ item, onSave, onCancel }) {
+  const [form, setForm] = useState({
+    name: item.name,
+    description: item.description ?? '',
+    unit_price: item.unit_price,
+    invoicing_model: item.invoicing_model ?? '',
+    term_years: item.term_years ?? '',
+  })
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  function set(field, value) {
+    setForm(f => ({ ...f, [field]: value }))
+  }
+
+  async function save() {
+    setSaving(true)
+    setError('')
+    try {
+      const payload = {
+        name: form.name,
+        description: form.description || null,
+        unit_price: Number(form.unit_price),
+        invoicing_model: form.invoicing_model || null,
+        term_years: form.term_years ? Number(form.term_years) : null,
+      }
+      const updated = await api.updateCatalogItem(item.id, payload)
+      onSave(updated)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <tr className="border-b bg-muted/20">
+      <td className="px-4 py-2" colSpan={6}>
+        <div className="flex flex-wrap gap-3 items-end">
+          <div>
+            <label className="text-xs text-muted-foreground block mb-1">Name</label>
+            <input
+              className="border rounded-md px-3 py-1.5 text-sm bg-background w-48"
+              value={form.name}
+              onChange={e => set('name', e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground block mb-1">Unit Price (€)</label>
+            <input
+              type="number" min="0" step="0.01"
+              className="border rounded-md px-3 py-1.5 text-sm bg-background w-32"
+              value={form.unit_price}
+              onChange={e => set('unit_price', e.target.value)}
+            />
+          </div>
+          {item.item_type === 'service' && (
+            <>
+              <div>
+                <label className="text-xs text-muted-foreground block mb-1">Invoicing</label>
+                <select
+                  className="border rounded-md px-3 py-1.5 text-sm bg-background"
+                  value={form.invoicing_model}
+                  onChange={e => set('invoicing_model', e.target.value)}
+                >
+                  <option value="">Select…</option>
+                  <option value="one_off">One-off</option>
+                  <option value="fixed_term">Fixed term</option>
+                  <option value="monthly_recurring">Monthly recurring</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground block mb-1">Term (years)</label>
+                <input
+                  type="number" min="1"
+                  className="border rounded-md px-3 py-1.5 text-sm bg-background w-24"
+                  value={form.term_years}
+                  onChange={e => set('term_years', e.target.value)}
+                />
+              </div>
+            </>
+          )}
+          <div className="flex-1 min-w-[200px]">
+            <label className="text-xs text-muted-foreground block mb-1">Description</label>
+            <input
+              className="border rounded-md px-3 py-1.5 text-sm bg-background w-full"
+              value={form.description}
+              onChange={e => set('description', e.target.value)}
+            />
+          </div>
+          <div className="flex gap-2 pb-0.5">
+            <Button size="sm" onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save'}</Button>
+            <Button size="sm" variant="outline" onClick={onCancel}>Cancel</Button>
+          </div>
+        </div>
+        {error && <p className="text-destructive text-xs mt-2">{error}</p>}
+      </td>
+    </tr>
+  )
+}
+
 export default function Catalog() {
   const [items, setItems] = useState([])
   const [form, setForm] = useState(initialForm)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [editingId, setEditingId] = useState(null)
 
   useEffect(() => {
     api.getCatalog()
@@ -80,13 +182,17 @@ export default function Catalog() {
 
   async function handleRetire(itemId) {
     setError('')
-
     try {
       await api.retireCatalogItem(itemId)
       setItems((current) => current.filter((item) => item.id !== itemId))
     } catch (err) {
       setError(err.message)
     }
+  }
+
+  function handleSaveEdit(updated) {
+    setItems(current => current.map(item => item.id === updated.id ? updated : item))
+    setEditingId(null)
   }
 
   return (
@@ -124,22 +230,40 @@ export default function Catalog() {
             </thead>
             <tbody>
               {items.map((item) => (
-                <tr key={item.id} className="border-b last:border-0 hover:bg-muted/30">
-                  <td className="px-4 py-3">
-                    <p className="font-medium">{item.name}</p>
-                    <p className="text-xs text-muted-foreground">{item.description ?? 'No description'}</p>
-                  </td>
-                  <td className="px-4 py-3 text-muted-foreground">{item.sku}</td>
-                  <td className="px-4 py-3 capitalize">{item.item_type}</td>
-                  <td className="px-4 py-3">{item.currency} {item.unit_price.toLocaleString()}</td>
-                  <td className="px-4 py-3 text-muted-foreground">
-                    {item.invoicing_model ? invoicingLabels[item.invoicing_model] : '—'}
-                    {item.term_years ? ` · ${item.term_years}y` : ''}
-                  </td>
-                  <td className="px-4 py-3">
-                    <Button variant="outline" size="sm" onClick={() => handleRetire(item.id)}>Retire</Button>
-                  </td>
-                </tr>
+                <>
+                  <tr key={item.id} className="border-b hover:bg-muted/30">
+                    <td className="px-4 py-3">
+                      <p className="font-medium">{item.name}</p>
+                      <p className="text-xs text-muted-foreground">{item.description ?? 'No description'}</p>
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">{item.sku}</td>
+                    <td className="px-4 py-3 capitalize">{item.item_type}</td>
+                    <td className="px-4 py-3">{item.currency} {item.unit_price.toLocaleString()}</td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {item.invoicing_model ? invoicingLabels[item.invoicing_model] : '—'}
+                      {item.term_years ? ` · ${item.term_years}y` : ''}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline" size="sm"
+                          onClick={() => setEditingId(editingId === item.id ? null : item.id)}
+                        >
+                          {editingId === item.id ? 'Cancel' : 'Edit'}
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => handleRetire(item.id)}>Retire</Button>
+                      </div>
+                    </td>
+                  </tr>
+                  {editingId === item.id && (
+                    <EditRow
+                      key={`edit-${item.id}`}
+                      item={item}
+                      onSave={handleSaveEdit}
+                      onCancel={() => setEditingId(null)}
+                    />
+                  )}
+                </>
               ))}
               {!loading && items.length === 0 && (
                 <tr>
