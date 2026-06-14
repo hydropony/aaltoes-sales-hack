@@ -7,9 +7,9 @@ import { UserContext } from '@/lib/UserContext'
 const statusConfig = {
   draft:           { label: 'Draft',                     color: 'bg-muted text-muted-foreground',  banner: 'bg-muted/50 border-muted' },
   pending_sm:      { label: 'Awaiting SM Approval',      color: 'bg-blue-100 text-blue-800',       banner: 'bg-blue-50 border-blue-200' },
-  pending_finance: { label: 'Awaiting Finance Approval',  color: 'bg-blue-100 text-blue-800',       banner: 'bg-blue-50 border-blue-200' },
-  locked:          { label: 'Approved & Locked',          color: 'bg-green-100 text-green-800',     banner: 'bg-green-50 border-green-200' },
-  rejected:        { label: 'Rejected',                   color: 'bg-red-100 text-red-800',         banner: 'bg-red-50 border-red-200' },
+  pending_finance: { label: 'Awaiting Finance Approval', color: 'bg-blue-100 text-blue-800',       banner: 'bg-blue-50 border-blue-200' },
+  locked:          { label: 'Approved & Locked',         color: 'bg-green-100 text-green-800',     banner: 'bg-green-50 border-green-200' },
+  rejected:        { label: 'Rejected',                  color: 'bg-red-100 text-red-800',         banner: 'bg-red-50 border-red-200' },
 }
 
 export default function OfferDetail() {
@@ -20,30 +20,91 @@ export default function OfferDetail() {
   const [lines, setLines] = useState([])
   const [catalog, setCatalog] = useState([])
   const [loading, setLoading] = useState(true)
-  const [creating, setCreating] = useState(false)
+
+  // Approval flow state
   const [approving, setApproving] = useState(false)
   const [rejecting, setRejecting] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
-  const [actionError, setActionError] = useState(null)
   const [showRejectForm, setShowRejectForm] = useState(false)
+  const [actionError, setActionError] = useState(null)
+
+  // Draft editing state
+  const [search, setSearch] = useState('')
+  const [justification, setJustification] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [draftError, setDraftError] = useState(null)
+
+  // New version state
+  const [creating, setCreating] = useState(false)
 
   useEffect(() => {
-    Promise.all([
-      api.getOffer(id),
-      api.getOfferLines(id),
-      api.getCatalog(),
-    ])
-      .then(([o, l, c]) => { setOffer(o); setLines(l); setCatalog(c) })
+    Promise.all([api.getOffer(id), api.getOfferLines(id), api.getCatalog()])
+      .then(([o, l, c]) => {
+        setOffer(o)
+        setLines(l)
+        setCatalog(c)
+        setJustification(o.discount_justification ?? '')
+      })
       .catch(console.error)
       .finally(() => setLoading(false))
   }, [id])
+
+  function catalogName(catalogItemId) {
+    return catalog.find(c => c.id === catalogItemId)?.name ?? `Item #${catalogItemId}`
+  }
+
+  // ── Draft editing ──────────────────────────────────────────────────────────
+
+  const filteredCatalog = search
+    ? catalog.filter(i => i.name.toLowerCase().includes(search.toLowerCase()) || i.sku.toLowerCase().includes(search.toLowerCase()))
+    : []
+
+  async function addLine(item) {
+    setSearch('')
+    if (lines.find(l => l.catalog_item_id === item.id)) return
+    const line = await api.addOfferLine(id, { catalog_item_id: item.id, quantity: 1, discount_pct: 0 })
+    setLines(prev => [...prev, line])
+    const updated = await api.getOffer(id)
+    setOffer(updated)
+  }
+
+  async function removeLine(lineId) {
+    await api.removeOfferLine(id, lineId)
+    setLines(prev => prev.filter(l => l.id !== lineId))
+    const updated = await api.getOffer(id)
+    setOffer(updated)
+  }
+
+  async function submitDraft() {
+    const hasDiscount = lines.some(l => l.discount_pct > 0)
+    if (hasDiscount && !justification.trim()) {
+      setDraftError('Justification is required when a discount is applied.')
+      return
+    }
+    if (lines.length === 0) { setDraftError('Add at least one line item.'); return }
+    setSubmitting(true)
+    setDraftError(null)
+    try {
+      const maxDiscount = Math.max(...lines.map(l => l.discount_pct))
+      const updated = await api.submitOffer(id, {
+        discount_pct: maxDiscount,
+        discount_justification: justification.trim() || null,
+      })
+      setOffer(updated)
+    } catch (e) {
+      setDraftError(e.message)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  // ── Approval flow ──────────────────────────────────────────────────────────
 
   async function handleApprove() {
     setApproving(true)
     setActionError(null)
     try {
-      const updated = await api.approveOffer(id)
-      setOffer(updated)
+      setOffer(await api.approveOffer(id))
       setShowRejectForm(false)
     } catch (err) {
       setActionError(err.message)
@@ -57,8 +118,7 @@ export default function OfferDetail() {
     setRejecting(true)
     setActionError(null)
     try {
-      const updated = await api.rejectOffer(id, rejectReason.trim())
-      setOffer(updated)
+      setOffer(await api.rejectOffer(id, rejectReason.trim()))
       setShowRejectForm(false)
       setRejectReason('')
     } catch (err) {
@@ -68,30 +128,16 @@ export default function OfferDetail() {
     }
   }
 
-  function catalogName(catalogItemId) {
-    return catalog.find(c => c.id === catalogItemId)?.name ?? `Item #${catalogItemId}`
-  }
+  // ── New version ────────────────────────────────────────────────────────────
 
   async function createNewVersion() {
     if (!offer) return
     setCreating(true)
     try {
-      // Create a new offer with same deal/account
-      const newOffer = await api.createOffer({
-        account_id: offer.account_id,
-        deal_id: offer.deal_id,
-        currency: offer.currency,
-      })
-
-      // Copy lines from current offer
+      const newOffer = await api.createOffer({ account_id: offer.account_id, deal_id: offer.deal_id, currency: offer.currency })
       for (const line of lines) {
-        await api.addOfferLine(newOffer.id, {
-          catalog_item_id: line.catalog_item_id,
-          quantity: line.quantity,
-          discount_pct: line.discount_pct,
-        })
+        await api.addOfferLine(newOffer.id, { catalog_item_id: line.catalog_item_id, quantity: line.quantity, discount_pct: line.discount_pct })
       }
-
       navigate(`/offers/${newOffer.id}`)
     } catch (e) {
       console.error(e)
@@ -100,14 +146,20 @@ export default function OfferDetail() {
     }
   }
 
+  // ── Render ─────────────────────────────────────────────────────────────────
+
   if (loading) return <p className="text-muted-foreground text-sm p-8">Loading...</p>
   if (!offer) return <p className="text-destructive text-sm p-8">Offer not found.</p>
 
   const cfg = statusConfig[offer.status] ?? statusConfig.draft
   const role = currentUser?.role
+  const isDraft = offer.status === 'draft'
   const canApprove =
     (role === 'sm'      && offer.status === 'pending_sm') ||
     (role === 'finance' && offer.status === 'pending_finance')
+
+  const draftSubtotal = lines.reduce((s, l) => s + l.line_total, 0)
+  const hasDiscount = lines.some(l => l.discount_pct > 0)
 
   return (
     <div>
@@ -124,66 +176,47 @@ export default function OfferDetail() {
           <p className="text-xs text-blue-700 mb-4">
             Review the line items and totals below, then approve or reject with a reason.
           </p>
-
           {!showRejectForm ? (
             <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={handleApprove}
-                disabled={approving}
-                className="px-4 py-2 rounded-md text-sm font-medium bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 transition-colors"
-              >
+              <button type="button" onClick={handleApprove} disabled={approving}
+                className="px-4 py-2 rounded-md text-sm font-medium bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 transition-colors">
                 {approving ? 'Approving…' : '✓ Approve'}
               </button>
-              <button
-                type="button"
-                onClick={() => { setShowRejectForm(true); setActionError(null) }}
-                className="px-4 py-2 rounded-md text-sm font-medium border border-destructive text-destructive hover:bg-destructive/10 transition-colors"
-              >
+              <button type="button" onClick={() => { setShowRejectForm(true); setActionError(null) }}
+                className="px-4 py-2 rounded-md text-sm font-medium border border-destructive text-destructive hover:bg-destructive/10 transition-colors">
                 ✕ Reject
               </button>
             </div>
           ) : (
             <div className="flex flex-col gap-3">
-              <textarea
-                rows={3}
-                value={rejectReason}
-                onChange={(e) => setRejectReason(e.target.value)}
+              <textarea rows={3} value={rejectReason} onChange={e => setRejectReason(e.target.value)}
                 placeholder="Explain why this offer is being rejected…"
-                className="w-full border border-blue-300 rounded-md px-3 py-2 text-sm bg-white resize-none focus:outline-none focus:ring-2 focus:ring-blue-400"
-              />
+                className="w-full border border-blue-300 rounded-md px-3 py-2 text-sm bg-white resize-none" />
               <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={handleReject}
-                  disabled={rejecting}
-                  className="px-4 py-2 rounded-md text-sm font-medium bg-destructive text-destructive-foreground hover:opacity-90 disabled:opacity-50 transition-colors"
-                >
+                <button type="button" onClick={handleReject} disabled={rejecting}
+                  className="px-4 py-2 rounded-md text-sm font-medium bg-destructive text-destructive-foreground hover:opacity-90 disabled:opacity-50 transition-colors">
                   {rejecting ? 'Rejecting…' : 'Confirm Reject'}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => { setShowRejectForm(false); setRejectReason(''); setActionError(null) }}
-                  className="px-4 py-2 rounded-md text-sm font-medium border bg-white hover:bg-muted transition-colors"
-                >
+                <button type="button" onClick={() => { setShowRejectForm(false); setRejectReason(''); setActionError(null) }}
+                  className="px-4 py-2 rounded-md text-sm font-medium border bg-white hover:bg-muted transition-colors">
                   Cancel
                 </button>
               </div>
             </div>
           )}
-
-          {actionError && (
-            <p className="text-destructive text-xs mt-3">{actionError}</p>
-          )}
+          {actionError && <p className="text-destructive text-xs mt-3">{actionError}</p>}
         </div>
       )}
 
-      {/* Status banner */}
+      {/* ── Status banner ── */}
       <div className={`rounded-lg border p-4 mb-6 ${cfg.banner}`}>
         <div className="flex items-center justify-between">
           <div>
             <span className={`px-3 py-1 rounded-full text-sm font-medium ${cfg.color}`}>{cfg.label}</span>
-            <span className="text-sm text-muted-foreground ml-3">Offer v{offer.version}</span>
+            <span className="text-sm text-muted-foreground ml-3">
+              {offer.account_name ?? `Account #${offer.account_id}`}
+              {offer.deal_name ? ` · ${offer.deal_name}` : ''} · v{offer.version}
+            </span>
           </div>
           {(offer.status === 'locked' || offer.status === 'rejected') && (
             <Button size="sm" onClick={createNewVersion} disabled={creating}>
@@ -191,8 +224,6 @@ export default function OfferDetail() {
             </Button>
           )}
         </div>
-
-        {/* Timestamps */}
         {offer.status === 'pending_sm' && (
           <p className="text-xs text-muted-foreground mt-2">Submitted {new Date(offer.created_at).toLocaleString()}</p>
         )}
@@ -204,7 +235,7 @@ export default function OfferDetail() {
         )}
       </div>
 
-      {/* Rejection reason */}
+      {/* ── Rejection reason ── */}
       {offer.status === 'rejected' && offer.rejection_reason && (
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 mb-6">
           <p className="text-sm font-medium text-red-800 mb-1">Rejection Reason</p>
@@ -212,7 +243,31 @@ export default function OfferDetail() {
         </div>
       )}
 
-      {/* Line items */}
+      {/* ── Draft: catalog search to add lines ── */}
+      {isDraft && (
+        <div className="mb-4 relative">
+          <label className="text-xs text-muted-foreground mb-1 block">Add item from catalog</label>
+          <input
+            className="w-full border rounded-md px-3 py-2 text-sm bg-background"
+            placeholder="Search by name or SKU…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+          {filteredCatalog.length > 0 && (
+            <div className="absolute top-full left-0 right-0 mt-1 bg-card border rounded-lg shadow-lg z-10 max-h-52 overflow-y-auto">
+              {filteredCatalog.map(item => (
+                <button key={item.id} onClick={() => addLine(item)}
+                  className="w-full text-left px-4 py-2 text-sm hover:bg-muted/50 flex justify-between">
+                  <span>{item.name} <span className="text-muted-foreground text-xs">({item.sku})</span></span>
+                  <span className="text-muted-foreground">€{item.unit_price.toLocaleString()}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Line items ── */}
       <h2 className="text-lg font-semibold mb-3">Line Items</h2>
       <div className="rounded-lg border bg-card overflow-hidden mb-6">
         <table className="w-full text-sm">
@@ -223,6 +278,7 @@ export default function OfferDetail() {
               <th className="text-right px-4 py-3 font-medium">Unit Price (€)</th>
               <th className="text-right px-4 py-3 font-medium">Discount %</th>
               <th className="text-right px-4 py-3 font-medium">Line Total (€)</th>
+              {isDraft && <th className="px-4 py-3" />}
             </tr>
           </thead>
           <tbody>
@@ -233,35 +289,65 @@ export default function OfferDetail() {
                 <td className="px-4 py-3 text-right tabular-nums">€{line.unit_price.toLocaleString()}</td>
                 <td className="px-4 py-3 text-right tabular-nums">{line.discount_pct}%</td>
                 <td className="px-4 py-3 text-right tabular-nums font-medium">€{line.line_total.toLocaleString()}</td>
+                {isDraft && (
+                  <td className="px-4 py-3">
+                    <button onClick={() => removeLine(line.id)}
+                      className="text-muted-foreground hover:text-destructive text-sm">✕</button>
+                  </td>
+                )}
               </tr>
             ))}
             {lines.length === 0 && (
-              <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">No line items.</td></tr>
+              <tr><td colSpan={isDraft ? 6 : 5} className="px-4 py-8 text-center text-muted-foreground">
+                {isDraft ? 'Search the catalog above to add items.' : 'No line items.'}
+              </td></tr>
             )}
           </tbody>
         </table>
       </div>
 
-      {/* Totals */}
+      {/* ── Totals ── */}
       <div className="rounded-lg border bg-card p-6 mb-6">
         <div className="flex flex-col gap-2 text-sm max-w-xs ml-auto">
           <div className="flex justify-between">
             <span className="text-muted-foreground">Subtotal</span>
-            <span className="tabular-nums">€{offer.subtotal.toLocaleString()}</span>
+            <span className="tabular-nums">€{(isDraft ? draftSubtotal : offer.subtotal).toLocaleString()}</span>
           </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Discount ({offer.discount_pct}%)</span>
-            <span className="tabular-nums text-red-600">−€{offer.discount_amount.toLocaleString()}</span>
-          </div>
+          {!isDraft && (
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Discount ({offer.discount_pct}%)</span>
+              <span className="tabular-nums text-red-600">−€{offer.discount_amount.toLocaleString()}</span>
+            </div>
+          )}
           <div className="flex justify-between font-semibold text-base border-t pt-2">
             <span>Total</span>
-            <span className="tabular-nums">€{offer.total_value.toLocaleString()}</span>
+            <span className="tabular-nums">€{(isDraft ? draftSubtotal : offer.total_value).toLocaleString()}</span>
           </div>
         </div>
       </div>
 
-      {/* Discount justification */}
-      {offer.discount_justification && (
+      {/* ── Draft: justification + submit ── */}
+      {isDraft && (
+        <div className="flex flex-col gap-4">
+          {hasDiscount && (
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Discount Justification *</label>
+              <textarea rows={3} value={justification} onChange={e => setJustification(e.target.value)}
+                placeholder="Explain why the discount is justified…"
+                className="w-full border rounded-md px-3 py-2 text-sm bg-background resize-none" />
+            </div>
+          )}
+          {draftError && <p className="text-destructive text-sm">{draftError}</p>}
+          <div className="flex justify-end">
+            <Button onClick={submitDraft} disabled={submitting}>
+              {submitting ? 'Submitting…' : 'Submit Offer'}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Discount justification (read-only) ── */}
+      {!isDraft && offer.discount_justification && (
         <div className="rounded-lg border bg-card p-4">
           <p className="text-xs text-muted-foreground mb-1">Discount Justification</p>
           <p className="text-sm">{offer.discount_justification}</p>

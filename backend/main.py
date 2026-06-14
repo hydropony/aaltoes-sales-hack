@@ -760,6 +760,22 @@ def add_offer_line(offer_id: int, body: OfferLineItemIn, db: Session = Depends(g
     db.refresh(line)
     return line
 
+@app.delete("/offers/{offer_id}/lines/{line_id}", status_code=204)
+def delete_offer_line(offer_id: int, line_id: int, db: Session = Depends(get_db),
+                      current_user: User = Depends(get_current_user)):
+    offer = db.get(Offer, offer_id)
+    if not offer:
+        raise HTTPException(404, "Offer not found")
+    if offer.status != "draft":
+        raise HTTPException(400, "Cannot modify a non-draft offer")
+    line = db.get(OfferLineItem, line_id)
+    if not line or line.offer_id != offer_id:
+        raise HTTPException(404, "Line not found")
+    db.delete(line)
+    db.flush()
+    _recalc_offer(offer, db)
+    db.commit()
+
 @app.post("/offers/{offer_id}/submit", response_model=OfferOut)
 def submit_offer(offer_id: int, body: OfferSubmit, db: Session = Depends(get_db),
                  current_user: User = Depends(get_current_user)):

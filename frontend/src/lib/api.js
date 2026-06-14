@@ -70,6 +70,7 @@ export const api = {
   createOffer: (data) => request('/offers', { method: 'POST', body: JSON.stringify(data) }),
   getOfferLines: (id) => request(`/offers/${id}/lines`),
   addOfferLine: (id, data) => request(`/offers/${id}/lines`, { method: 'POST', body: JSON.stringify(data) }),
+  removeOfferLine: (offerId, lineId) => fetch(`${BASE}/offers/${offerId}/lines/${lineId}`, { method: 'DELETE', headers: { 'X-User-ID': getUserId() } }).then(res => { if (!res.ok) throw new Error(res.status) }),
   submitOffer: (id, data) => request(`/offers/${id}/submit`, { method: 'POST', body: JSON.stringify(data) }),
   approveOffer: (id) => request(`/offers/${id}/approve`, { method: 'POST', body: JSON.stringify({}) }),
   rejectOffer: (id, reason) => request(`/offers/${id}/reject`, { method: 'POST', body: JSON.stringify({ reason }) }),
