@@ -27,7 +27,7 @@ app = FastAPI(title="HMD Secure CRM", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=["http://localhost:5173", "http://localhost:5174"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -199,6 +199,13 @@ class CatalogItemIn(BaseModel):
     description: Optional[str] = None
     unit_price: float
     currency: str = "EUR"
+    invoicing_model: Optional[str] = None
+    term_years: Optional[int] = None
+
+class CatalogItemUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    unit_price: Optional[float] = None
     invoicing_model: Optional[str] = None
     term_years: Optional[int] = None
 
@@ -590,6 +597,18 @@ def create_catalog_item(body: CatalogItemIn, db: Session = Depends(get_db),
                          current_user: User = Depends(require_role("finance"))):
     item = CatalogItem(created_by=current_user.id, **body.model_dump())
     db.add(item)
+    db.commit()
+    db.refresh(item)
+    return item
+
+@app.patch("/catalog/{item_id}", response_model=CatalogItemOut)
+def update_catalog_item(item_id: int, body: CatalogItemUpdate, db: Session = Depends(get_db),
+                         current_user: User = Depends(require_role("finance"))):
+    item = db.get(CatalogItem, item_id)
+    if not item:
+        raise HTTPException(404, "Catalog item not found")
+    for field, value in body.model_dump(exclude_unset=True).items():
+        setattr(item, field, value)
     db.commit()
     db.refresh(item)
     return item

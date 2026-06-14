@@ -1,15 +1,17 @@
-import { useEffect, useState } from 'react'
+import { useContext, useEffect, useState } from 'react'
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useNavigate } from 'react-router-dom'
 import Layout from './components/layout/Layout'
 import Dashboard from './pages/Dashboard'
+import FinanceDashboard from './pages/FinanceDashboard'
+import SMDashboard from './pages/SMDashboard'
 import Accounts from './pages/Accounts'
 import AccountDetail from './pages/AccountDetail'
 import Deals from './pages/Deals'
 import Cases from './pages/Cases'
 import CaseDetail from './pages/CaseDetail'
-import Catalog from './pages/Catalog'
 import TAMDashboard from './pages/TAMDashboard'
 import Offers from './pages/Offers'
+import Catalog from './pages/Catalog'
 import RepDashboard from './features/deals/RepDashboard'
 import DealDetail from './features/deals/DealDetail'
 import Pipeline from './features/deals/Pipeline'
@@ -25,6 +27,13 @@ export default function App() {
       <AppShell />
     </BrowserRouter>
   )
+}
+
+function RootDashboard() {
+  const user = useContext(UserContext)
+  if (user?.role === 'finance') return <FinanceDashboard />
+  if (user?.role === 'sm')      return <SMDashboard />
+  return <Dashboard />
 }
 
 function defaultPathForRole(role) {
@@ -115,7 +124,7 @@ function AppShell() {
         path="/"
         element={<Layout currentUser={currentUser} onSignOut={handleSignOut} />}
       >
-        <Route index element={<Dashboard />} />
+        <Route index element={<RootDashboard />} />
         <Route path="accounts" element={<Accounts />} />
         <Route path="accounts/:id" element={<AccountDetail />} />
         <Route path="deals" element={<Deals />} />

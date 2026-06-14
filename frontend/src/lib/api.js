@@ -70,10 +70,13 @@ export const api = {
   getOfferLines: (id) => request(`/offers/${id}/lines`),
   addOfferLine: (id, data) => request(`/offers/${id}/lines`, { method: 'POST', body: JSON.stringify(data) }),
   submitOffer: (id, data) => request(`/offers/${id}/submit`, { method: 'POST', body: JSON.stringify(data) }),
+  approveOffer: (id) => request(`/offers/${id}/approve`, { method: 'POST', body: JSON.stringify({}) }),
+  rejectOffer: (id, reason) => request(`/offers/${id}/reject`, { method: 'POST', body: JSON.stringify({ reason }) }),
 
   // Catalog
   getCatalog: () => request('/catalog'),
   createCatalogItem: (data) => request('/catalog', { method: 'POST', body: JSON.stringify(data) }),
+  updateCatalogItem: (id, data) => request(`/catalog/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   retireCatalogItem: (id) => request(`/catalog/${id}/retire`, { method: 'PATCH' }),
 
   // Notifications

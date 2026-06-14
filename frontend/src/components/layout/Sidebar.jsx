@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom'
+import NotificationBell from '../NotificationBell'
 
 const NAV_BY_ROLE = {
   rep: [
@@ -54,6 +55,9 @@ export default function Sidebar({ currentUser, onSignOut }) {
           </NavLink>
         ))}
       </nav>
+      <div className="border-t border-sidebar-border p-3">
+        <NotificationBell />
+      </div>
       <div className="border-t border-sidebar-border p-4 space-y-2">
         <div className="text-sm text-sidebar-foreground">
           <div className="font-medium">{currentUser?.full_name ?? 'No user selected'}</div>
