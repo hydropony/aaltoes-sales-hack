@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { api } from '@/lib/api'
+import { useCurrentUser } from '@/lib/UserContext'
 
 const TABS = ['Overview', 'Contacts', 'Deals', 'Cases', 'Timeline', 'Notes']
 
@@ -76,12 +77,155 @@ function AddContactModal({ accountId, onClose, onSaved }) {
   )
 }
 
+// ── Timeline helpers ──────────────────────────────────────────────────────────
+
+const EVENT_STYLES = {
+  deal_created:        { color: 'bg-blue-100 text-blue-800',   label: 'Created' },
+  deal_stage_changed:  { color: 'bg-blue-100 text-blue-800',   label: 'Stage changed' },
+  deal_won:            { color: 'bg-green-100 text-green-800',  label: 'Won' },
+  deal_lost:           { color: 'bg-red-100 text-red-800',      label: 'Lost' },
+  case_opened:         { color: 'bg-yellow-100 text-yellow-800',label: 'Opened' },
+  case_escalated:      { color: 'bg-orange-100 text-orange-800',label: 'Escalated' },
+  case_in_progress:    { color: 'bg-blue-100 text-blue-800',    label: 'In progress' },
+  case_resolved:       { color: 'bg-green-100 text-green-800',  label: 'Resolved' },
+  case_closed:         { color: 'bg-muted text-muted-foreground', label: 'Closed' },
+  offer_submitted:     { color: 'bg-blue-100 text-blue-800',   label: 'Submitted' },
+  offer_approved:      { color: 'bg-green-100 text-green-800',  label: 'Approved' },
+  offer_locked:        { color: 'bg-green-100 text-green-800',  label: 'Locked' },
+  offer_rejected:      { color: 'bg-red-100 text-red-800',      label: 'Rejected' },
+  offer_created:       { color: 'bg-muted text-muted-foreground', label: 'Draft' },
+  note_added:          { color: 'bg-muted text-muted-foreground', label: 'Note' },
+  contact_added:       { color: 'bg-muted text-muted-foreground', label: 'Contact' },
+}
+
+function fmtDateTime(iso) {
+  const d = new Date(iso)
+  return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
+    + ' · '
+    + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+}
+
+function EventRow({ event }) {
+  const style = EVENT_STYLES[event.event_type] ?? { color: 'bg-muted text-muted-foreground', label: event.event_type }
+  return (
+    <div className="flex gap-3 items-start py-2.5 border-b last:border-0">
+      <span className="text-xs text-muted-foreground whitespace-nowrap mt-0.5 w-40 shrink-0">
+        {fmtDateTime(event.created_at)}
+      </span>
+      <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${style.color}`}>
+        {style.label}
+      </span>
+      <span className="text-sm text-foreground">{event.summary}</span>
+    </div>
+  )
+}
+
+function TimelineByCase({ events, entityNames }) {
+  const caseEvents = events.filter(e => e.entity_type === 'case')
+  const otherEvents = events.filter(e => e.entity_type !== 'case')
+
+  const groups = {}
+  for (const e of caseEvents) {
+    if (!groups[e.entity_id]) groups[e.entity_id] = []
+    groups[e.entity_id].push(e)
+  }
+
+  const sortedGroups = Object.entries(groups).sort(
+    ([, a], [, b]) => new Date(b[0].created_at) - new Date(a[0].created_at)
+  )
+
+  return (
+    <div className="flex flex-col gap-4">
+      {sortedGroups.map(([entityId, evts]) => (
+        <div key={entityId} className="rounded-lg border bg-card overflow-hidden">
+          <div className="px-4 py-2 bg-muted/40 border-b">
+            <span className="text-sm font-semibold text-foreground">
+              {entityNames[`case-${entityId}`] ?? `Case #${entityId}`}
+            </span>
+          </div>
+          <div className="px-4">
+            {evts.map(e => <EventRow key={e.id} event={e} />)}
+          </div>
+        </div>
+      ))}
+      {otherEvents.length > 0 && (
+        <div className="rounded-lg border bg-card overflow-hidden">
+          <div className="px-4 py-2 bg-muted/40 border-b">
+            <span className="text-sm font-semibold text-foreground">Other activity</span>
+          </div>
+          <div className="px-4">
+            {otherEvents.map(e => <EventRow key={e.id} event={e} />)}
+          </div>
+        </div>
+      )}
+      {events.length === 0 && <p className="text-muted-foreground text-sm">No activity yet.</p>}
+    </div>
+  )
+}
+
+function TimelineByDeal({ events, entityNames }) {
+  const dealEvents = events.filter(e => e.entity_type === 'deal' || e.entity_type === 'offer')
+  const otherEvents = events.filter(e => e.entity_type !== 'deal' && e.entity_type !== 'offer')
+
+  const groups = {}
+  for (const e of dealEvents) {
+    const key = `deal-${e.entity_id}`
+    if (!groups[key]) groups[key] = []
+    groups[key].push(e)
+  }
+
+  const sortedGroups = Object.entries(groups).sort(
+    ([, a], [, b]) => new Date(b[0].created_at) - new Date(a[0].created_at)
+  )
+
+  return (
+    <div className="flex flex-col gap-4">
+      {sortedGroups.map(([key, evts]) => (
+        <div key={key} className="rounded-lg border bg-card overflow-hidden">
+          <div className="px-4 py-2 bg-muted/40 border-b">
+            <span className="text-sm font-semibold text-foreground">
+              {entityNames[key] ?? `Deal #${evts[0].entity_id}`}
+            </span>
+          </div>
+          <div className="px-4">
+            {evts.map(e => <EventRow key={e.id} event={e} />)}
+          </div>
+        </div>
+      ))}
+      {otherEvents.length > 0 && (
+        <div className="rounded-lg border bg-card overflow-hidden">
+          <div className="px-4 py-2 bg-muted/40 border-b">
+            <span className="text-sm font-semibold text-foreground">Other activity</span>
+          </div>
+          <div className="px-4">
+            {otherEvents.map(e => <EventRow key={e.id} event={e} />)}
+          </div>
+        </div>
+      )}
+      {events.length === 0 && <p className="text-muted-foreground text-sm">No activity yet.</p>}
+    </div>
+  )
+}
+
+function TimelineFlat({ events }) {
+  if (events.length === 0) return <p className="text-muted-foreground text-sm">No activity yet.</p>
+  return (
+    <div className="rounded-lg border bg-card overflow-hidden px-4">
+      {events.map(e => <EventRow key={e.id} event={e} />)}
+    </div>
+  )
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+
 export default function AccountDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const currentUser = useCurrentUser()
   const [tab, setTab] = useState('Overview')
   const [account, setAccount] = useState(null)
   const [data, setData] = useState(null)
+  const [entityNames, setEntityNames] = useState({})   // { "deal-1": "Nokia HQ...", "case-2": "MDM failure..." }
   const [loading, setLoading] = useState(true)
   const [noteBody, setNoteBody] = useState('')
   const [noteType, setNoteType] = useState('general')
@@ -97,10 +241,23 @@ export default function AccountDetail() {
       Contacts: () => api.getAccountContacts(id),
       Deals: () => api.getAccountDeals(id),
       Cases: () => api.getAccountCases(id),
-      Timeline: () => api.getAccountTimeline(id),
       Notes: () => api.getAccountNotes(id),
     }
-    if (fetchers[tab]) fetchers[tab]().then(setData).catch(console.error)
+    if (fetchers[tab]) {
+      fetchers[tab]().then(setData).catch(console.error)
+    } else if (tab === 'Timeline') {
+      Promise.all([
+        api.getAccountTimeline(id),
+        api.getAccountDeals(id),
+        api.getAccountCases(id),
+      ]).then(([timeline, deals, cases]) => {
+        setData(timeline)
+        const names = {}
+        for (const d of deals) names[`deal-${d.id}`] = d.name
+        for (const c of cases) names[`case-${c.id}`] = c.subject
+        setEntityNames(names)
+      }).catch(console.error)
+    }
   }, [tab, id])
 
   async function submitNote() {
@@ -250,14 +407,18 @@ export default function AccountDetail() {
       )}
 
       {tab === 'Timeline' && (
-        <div className="flex flex-col gap-3">
-          {(data ?? []).map((e) => (
-            <div key={e.id} className="flex gap-3 text-sm">
-              <span className="text-muted-foreground whitespace-nowrap">{new Date(e.created_at).toLocaleDateString()}</span>
-              <span>{e.description}</span>
-            </div>
-          ))}
-          {data?.length === 0 && <p className="text-muted-foreground text-sm">No activity yet.</p>}
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
+              {currentUser?.role === 'tam' ? 'Activity grouped by case' :
+               currentUser?.role === 'sm'  ? 'Activity grouped by deal' :
+               'Activity'}
+            </h2>
+          </div>
+          {!data && <p className="text-muted-foreground text-sm">Loading...</p>}
+          {data && currentUser?.role === 'tam' && <TimelineByCase events={data} entityNames={entityNames} />}
+          {data && currentUser?.role === 'sm'  && <TimelineByDeal events={data} entityNames={entityNames} />}
+          {data && currentUser?.role !== 'tam' && currentUser?.role !== 'sm' && <TimelineFlat events={data} />}
         </div>
       )}
 

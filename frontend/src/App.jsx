@@ -16,6 +16,7 @@ import OfferBuilder from './features/offers/OfferBuilder'
 import OfferDetail from './features/offers/OfferDetail'
 import { api } from './lib/api'
 import { clearStoredUserId, getStoredUserId, setStoredUserId } from './lib/auth'
+import { UserContext } from './lib/UserContext'
 
 export default function App() {
   return (
@@ -107,6 +108,7 @@ function AppShell() {
   }
 
   return currentUser ? (
+    <UserContext.Provider value={currentUser}>
     <Routes>
       <Route
         path="/"
@@ -128,6 +130,7 @@ function AppShell() {
         <Route path="*" element={<Navigate to={defaultPathForRole(currentUser?.role)} replace />} />
       </Route>
     </Routes>
+    </UserContext.Provider>
   ) : (
     <AuthGate
       users={users}
