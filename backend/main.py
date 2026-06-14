@@ -220,7 +220,9 @@ class OfferLineItemIn(BaseModel):
 class OfferOut(ORM):
     id: int
     account_id: int
+    account_name: Optional[str] = None
     deal_id: Optional[int] = None
+    deal_name: Optional[str] = None
     created_by: int
     version: int
     status: str
@@ -606,16 +608,22 @@ def retire_catalog_item(item_id: int, db: Session = Depends(get_db),
 
 # ── Offers ────────────────────────────────────────────────────────────────────
 
+def _offer_out(offer: Offer) -> OfferOut:
+    out = OfferOut.model_validate(offer)
+    out.account_name = offer.account.name if offer.account else None
+    out.deal_name = offer.deal.name if offer.deal else None
+    return out
+
 @app.get("/offers", response_model=list[OfferOut])
 def list_offers(db: Session = Depends(get_db)):
-    return db.query(Offer).all()
+    return [_offer_out(o) for o in db.query(Offer).all()]
 
 @app.get("/offers/{offer_id}", response_model=OfferOut)
 def get_offer(offer_id: int, db: Session = Depends(get_db)):
     offer = db.get(Offer, offer_id)
     if not offer:
         raise HTTPException(404, "Offer not found")
-    return offer
+    return _offer_out(offer)
 
 @app.get("/offers/{offer_id}/lines", response_model=list[OfferLineItemOut])
 def get_offer_lines(offer_id: int, db: Session = Depends(get_db)):
