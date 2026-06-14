@@ -72,7 +72,8 @@ function OfferTable({ offers, role, onOpen, highlight = false }) {
       <table className="w-full text-sm">
         <thead className={`${highlight ? 'bg-blue-100/60' : 'bg-muted/50'}`}>
           <tr>
-            <th className="text-left px-4 py-3 font-medium text-muted-foreground">Offer</th>
+            <th className="text-left px-4 py-3 font-medium text-muted-foreground">Company</th>
+            <th className="text-left px-4 py-3 font-medium text-muted-foreground">Deal</th>
             <th className="text-left px-4 py-3 font-medium text-muted-foreground">Version</th>
             <th className="text-right px-4 py-3 font-medium text-muted-foreground">Total</th>
             <th className="text-left px-4 py-3 font-medium text-muted-foreground">Status</th>
@@ -86,13 +87,14 @@ function OfferTable({ offers, role, onOpen, highlight = false }) {
             return (
               <tr key={o.id} className="hover:bg-muted/30 transition-colors">
                 <td className="px-4 py-3 font-medium">
-                  Offer #{o.id}
+                  {o.account_name ?? `Account #${o.account_id}`}
                   {actionNeeded && (
                     <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-600 text-white">
                       ACTION
                     </span>
                   )}
                 </td>
+                <td className="px-4 py-3 text-muted-foreground">{o.deal_name ?? '—'}</td>
                 <td className="px-4 py-3 text-muted-foreground">v{o.version}</td>
                 <td className="px-4 py-3 text-right tabular-nums font-medium">
                   €{o.total_value.toLocaleString('en-EU', { minimumFractionDigits: 2 })}
