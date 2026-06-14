@@ -9,6 +9,11 @@ import Cases from './pages/Cases'
 import CaseDetail from './pages/CaseDetail'
 import TAMDashboard from './pages/TAMDashboard'
 import Offers from './pages/Offers'
+import RepDashboard from './features/deals/RepDashboard'
+import DealDetail from './features/deals/DealDetail'
+import Pipeline from './features/deals/Pipeline'
+import OfferBuilder from './features/offers/OfferBuilder'
+import OfferDetail from './features/offers/OfferDetail'
 import { api } from './lib/api'
 import { clearStoredUserId, getStoredUserId, setStoredUserId } from './lib/auth'
 
@@ -67,7 +72,7 @@ function AppShell() {
   const defaultPath = useMemo(() => {
     if (!currentUser) return '/'
     if (currentUser.role === 'tam') return '/tam'
-    if (currentUser.role === 'rep') return '/accounts'
+    if (currentUser.role === 'rep') return '/rep'
     return '/'
   }, [currentUser])
 
@@ -111,10 +116,15 @@ function AppShell() {
         <Route path="accounts" element={<Accounts />} />
         <Route path="accounts/:id" element={<AccountDetail />} />
         <Route path="deals" element={<Deals />} />
+        <Route path="deals/:id" element={<DealDetail />} />
         <Route path="cases" element={<Cases />} />
         <Route path="cases/:id" element={<CaseDetail />} />
         <Route path="tam" element={<TAMDashboard />} />
+        <Route path="rep" element={<RepDashboard />} />
+        <Route path="pipeline" element={<Pipeline />} />
         <Route path="offers" element={<Offers />} />
+        <Route path="offers/new" element={<OfferBuilder />} />
+        <Route path="offers/:id" element={<OfferDetail />} />
         <Route path="*" element={<Navigate to={defaultPath} replace />} />
       </Route>
     </Routes>

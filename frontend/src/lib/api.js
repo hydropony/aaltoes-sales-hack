@@ -53,6 +53,28 @@ export const api = {
   setUserId: (userId) => setStoredUserId(userId),
   clearUserId: () => clearStoredUserId(),
 
-  // Catalog (for service dropdown)
+  // Deals
+  getDeals: () => request('/deals'),
+  getDeal: (id) => request(`/deals/${id}`),
+  createDeal: (data) => request('/deals', { method: 'POST', body: JSON.stringify(data) }),
+  updateDealStage: (id, data) => request(`/deals/${id}/stage`, { method: 'PATCH', body: JSON.stringify(data) }),
+  getDealForecast: (id) => request(`/deals/${id}/forecast`),
+  saveDealForecast: (id, rows) => request(`/deals/${id}/forecast`, { method: 'POST', body: JSON.stringify(rows) }),
+  getDealNotes: (id) => request(`/deals/${id}/notes`),
+  addDealNote: (id, data) => request(`/deals/${id}/notes`, { method: 'POST', body: JSON.stringify(data) }),
+
+  // Offers
+  getOffers: () => request('/offers'),
+  getOffer: (id) => request(`/offers/${id}`),
+  createOffer: (data) => request('/offers', { method: 'POST', body: JSON.stringify(data) }),
+  getOfferLines: (id) => request(`/offers/${id}/lines`),
+  addOfferLine: (id, data) => request(`/offers/${id}/lines`, { method: 'POST', body: JSON.stringify(data) }),
+  submitOffer: (id, data) => request(`/offers/${id}/submit`, { method: 'POST', body: JSON.stringify(data) }),
+
+  // Catalog
   getCatalog: () => request('/catalog'),
+
+  // Notifications
+  getNotifications: () => request('/notifications'),
+  markNotificationRead: (id) => request(`/notifications/${id}/read`, { method: 'PATCH' }),
 }
