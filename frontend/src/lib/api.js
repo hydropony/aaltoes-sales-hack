@@ -73,6 +73,8 @@ export const api = {
 
   // Catalog
   getCatalog: () => request('/catalog'),
+  createCatalogItem: (data) => request('/catalog', { method: 'POST', body: JSON.stringify(data) }),
+  retireCatalogItem: (id) => request(`/catalog/${id}/retire`, { method: 'PATCH' }),
 
   // Notifications
   getNotifications: () => request('/notifications'),

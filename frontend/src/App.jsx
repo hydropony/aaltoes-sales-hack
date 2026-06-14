@@ -7,6 +7,7 @@ import AccountDetail from './pages/AccountDetail'
 import Deals from './pages/Deals'
 import Cases from './pages/Cases'
 import CaseDetail from './pages/CaseDetail'
+import Catalog from './pages/Catalog'
 import TAMDashboard from './pages/TAMDashboard'
 import Offers from './pages/Offers'
 import RepDashboard from './features/deals/RepDashboard'
@@ -127,6 +128,10 @@ function AppShell() {
         <Route path="offers" element={<Offers />} />
         <Route path="offers/new" element={<OfferBuilder />} />
         <Route path="offers/:id" element={<OfferDetail />} />
+        <Route
+          path="catalog"
+          element={currentUser?.role === 'finance' ? <Catalog /> : <Navigate to={defaultPathForRole(currentUser?.role)} replace />}
+        />
         <Route path="*" element={<Navigate to={defaultPathForRole(currentUser?.role)} replace />} />
       </Route>
     </Routes>

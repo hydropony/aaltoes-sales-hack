@@ -32,7 +32,7 @@ export default function Sidebar({ currentUser, onSignOut }) {
   const links = NAV_BY_ROLE[currentUser?.role] ?? []
 
   return (
-    <aside className="w-56 min-h-screen bg-sidebar border-r border-sidebar-border flex flex-col">
+    <aside className="w-56 flex-none min-h-screen bg-sidebar border-r border-sidebar-border flex flex-col">
       <div className="px-6 py-5 border-b border-sidebar-border">
         <span className="font-semibold text-lg text-sidebar-foreground">HMD Secure CRM</span>
       </div>
